@@ -204,7 +204,6 @@ public class DocAnalyzer {
         // please change this to removing all English punctuation
         // token = token.replaceAll("\\W+", "");
 
-        // TODO change this remove characters to remove english punctuation
         StringBuilder sb = new StringBuilder(token);
         for(int i=0; i<sb.length(); i++) {
             if(m_punctuation.contains(sb.charAt(i))) {
@@ -218,6 +217,7 @@ public class DocAnalyzer {
 
         // add a line to recognize integers and doubles via regular expression
         // and convert the recognized integers and doubles to a special symbol "NUM"
+        token = token.replaceAll("\\d+(\\.\\d+)?", "NUM");
 
         return token;
     }

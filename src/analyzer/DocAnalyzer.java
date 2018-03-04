@@ -12,6 +12,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
@@ -27,6 +28,7 @@ import opennlp.tools.util.InvalidFormatException;
 import structures.LanguageModel;
 import structures.Post;
 import structures.Token;
+import utils.Utils;
 
 /**
  * @author hongning
@@ -56,13 +58,17 @@ public class DocAnalyzer {
     //a hashset of punctuation
     HashSet<Character> m_punctuation;
 
-    public DocAnalyzer(String tokenModel, String puncFileAddress, int N) throws InvalidFormatException, FileNotFoundException, IOException {
+    public DocAnalyzer(String tokenModel, String puncFileAddress, String stopWordsAddress, int N) throws InvalidFormatException, FileNotFoundException, IOException {
         m_N = N;
         m_reviews = new ArrayList<Post>();
         m_punctuation = new HashSet<>();
+        m_stopwords = new HashSet<>();
         m_tokenizer = new TokenizerME(new TokenizerModel(new FileInputStream(tokenModel)));
 
+        m_stats = new HashMap<>();
+
         loadPunctuation(puncFileAddress);
+        loadStopwords(stopWordsAddress);
     }
 
     public void loadPunctuation(String filename) {
@@ -83,7 +89,7 @@ public class DocAnalyzer {
 
     //sample code for loading a list of stopwords from file
     //you can manually modify the stopword file to include your newly selected words
-    public void LoadStopwords(String filename) {
+    public void loadStopwords(String filename) {
         try {
             BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(filename), "UTF-8"));
             String line;
@@ -106,7 +112,6 @@ public class DocAnalyzer {
             JSONArray jarray = json.getJSONArray("Reviews");
             for (int i = 0; i < jarray.length(); i++) {
                 Post review = new Post(jarray.getJSONObject(i));
-
                 String[] tokens = Tokenize(review.getContent());
                 review.setTokens(tokens);
 
@@ -117,6 +122,18 @@ public class DocAnalyzer {
                  * For efficiency purpose, you can accumulate a term's DF here as well
                  */
 
+                for(String word : tokens) {
+                    word = Normalization(word);
+                    word = SnowballStemming(word);
+                    if(m_stats.containsKey(word)) {
+                        Token temp = m_stats.get(word);
+                        temp.setValue(temp.getValue()+1);
+                    } else {
+                        Token temp = new Token(word);
+                        temp.setValue(1);
+                        m_stats.put(word, temp);
+                    }
+                }
                 m_reviews.add(review);
             }
         } catch (JSONException e) {
@@ -233,14 +250,23 @@ public class DocAnalyzer {
         }
     }
 
-    public static void main(String[] args) throws InvalidFormatException, FileNotFoundException, IOException {
-        DocAnalyzer analyzer = new DocAnalyzer("./data/Model/en-token.bin",
-                "./data/punctuation", 2);
-
+    public static void main(String[] args) throws Exception {
+        DocAnalyzer analyzer = new DocAnalyzer(
+                "./data/Model/en-token.bin",
+                "./data/punctuation",
+                "./data/stopwords",
+                2);
         //code for demonstrating tokenization and stemming
-        analyzer.TokenizerDemon("I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
+        //analyzer.TokenizerDemon("I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
 
         //entry point to deal with a collection of documents
-        //analyzer.LoadDirectory("./Data/yelp/train", ".json");
+
+        Map<String, Token> sortedMap;
+        analyzer.LoadDirectory("./Data/yelp/train", ".json");
+        analyzer.LoadDirectory("./Data/yelp/test", ".json");
+
+        sortedMap = Utils.sortByTokenValue(analyzer.m_stats);
+        Utils.plotHashMap(sortedMap);
+        //Utils.exportMap(sortedMap, "./test");
     }
 }

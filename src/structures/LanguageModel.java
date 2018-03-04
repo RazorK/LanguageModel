@@ -18,7 +18,7 @@ public class LanguageModel {
 	
 	double m_lambda; // parameter for linear interpolation smoothing
 	double m_delta; // parameter for absolute discount smoothing
-	
+
 	public LanguageModel(int N, int V) {
 		m_N = N;
 		m_model = new HashMap<String, Token>();

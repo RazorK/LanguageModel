@@ -14,6 +14,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 
+import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
 import org.tartarus.snowball.ext.porterStemmer;
@@ -28,7 +29,8 @@ import opennlp.tools.util.InvalidFormatException;
 import structures.LanguageModel;
 import structures.Post;
 import structures.Token;
-import utils.Utils;
+import utils.MapUtils;
+import utils.PlotUtils;
 
 /**
  * @author hongning
@@ -187,8 +189,8 @@ public class DocAnalyzer {
                 analyzeDocument(LoadJson(f.getAbsolutePath()));
             else if (f.isDirectory())
                 LoadDirectory(f.getAbsolutePath(), suffix);
-            // TODO test here.
-            break;
+            // TODO break
+            // break;
         }
         size = m_reviews.size() - size;
         System.out.println("Loading " + size + " review documents from " + folder);
@@ -265,8 +267,15 @@ public class DocAnalyzer {
         analyzer.LoadDirectory("./Data/yelp/train", ".json");
         analyzer.LoadDirectory("./Data/yelp/test", ".json");
 
-        sortedMap = Utils.sortByTokenValue(analyzer.m_stats);
-        Utils.plotHashMap(sortedMap);
-        //Utils.exportMap(sortedMap, "./test");
+        sortedMap = MapUtils.sortByTokenValue(analyzer.m_stats);
+        double [][] data = new double[sortedMap.size()][2];
+        MapUtils.get2DArrayFromMap(sortedMap, data);
+
+        SimpleRegression regression = new SimpleRegression();
+        regression.addData(data);
+        System.out.println("Linear Regression Slope: "+ regression.getSlope());
+        System.out.println("Linear Regression Interception" + regression.getIntercept());
+        // MapUtils.exportMap(sortedMap, "./test");
+        PlotUtils.plotHashMap(sortedMap);
     }
 }

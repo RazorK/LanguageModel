@@ -1,5 +1,7 @@
-import org.knowm.xchart.*;
-import org.knowm.xchart.style.markers.SeriesMarkers;
+import org.knowm.xchart.SwingWrapper;
+import org.knowm.xchart.XYChart;
+import org.knowm.xchart.XYChartBuilder;
+import org.knowm.xchart.style.Styler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,15 +11,37 @@ import java.util.List;
  * test
  */
 public class Test {
-    public static void main(String[] args) throws Exception {
 
-        double[] xData = new double[] { 0.0, 1.0, 2.0 };
-        double[] yData = new double[] { 2.0, 1.0, 0.0 };
+    public static void main(String[] args) {
+        new SwingWrapper(getChart()).displayChart();
+    }
+
+    public static XYChart getChart() {
+
+        // generates Log data
+        List<Integer> xData = new ArrayList<Integer>();
+        List<Double> yData = new ArrayList<Double>();
+        for (int i = -3; i <= 3; i++) {
+            xData.add(i);
+            yData.add(Math.pow(10, i));
+        }
 
         // Create Chart
-        XYChart chart = QuickChart.getChart("Sample Chart", "X", "Y", "y(x)", xData, yData);
+        XYChart chart = new XYChartBuilder().width(800).height(600).title("Powers of Ten").xAxisTitle("Power").yAxisTitle("Value").build();
 
-        // Show it
-        new SwingWrapper(chart).displayChart();
+        // Customize Chart
+        chart.getStyler().setChartTitleVisible(true);
+        chart.getStyler().setLegendPosition(Styler.LegendPosition.InsideNW);
+        chart.getStyler().setYAxisLogarithmic(true);
+        chart.getStyler().setXAxisLabelRotation(45);
+
+        // chart.getStyler().setXAxisLabelAlignment(TextAlignment.Right);
+        // chart.getStyler().setXAxisLabelRotation(90);
+        // chart.getStyler().setXAxisLabelRotation(0);
+
+        // Series
+        chart.addSeries("10^x", xData, yData);
+
+        return chart;
     }
 }

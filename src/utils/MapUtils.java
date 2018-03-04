@@ -11,13 +11,13 @@ import java.util.*;
 
 /**
  * Created by Raz on 2018/3/3.
- * Utils for this project.
+ * MapUtils for this project.
  * Token hashmap utils.
  */
 
-public class Utils {
+public class MapUtils {
 
-    // State Hashmap Utils
+    // State Hashmap MapUtils
     public static Map<String, Token> sortByTokenValue(Map<String, Token> map) {
         List<Map.Entry<String, Token>> list = new LinkedList<>(map.entrySet());
         Collections.sort(list, new Comparator<Object>() {
@@ -70,31 +70,30 @@ public class Utils {
         File file = new File(filePath);
         synchronized (file) {
             FileWriter fw = new FileWriter(filePath);
+            int i = 0;
             for(String word: map.keySet()) {
-                fw.write(word + ","+ map.get(word).getValue()+"\n");
+                fw.write(i + ","+ word + ","+ map.get(word).getValue()+"\n");
+                i++;
             }
             fw.close();
         }
     }
 
-    // Plot Utils
-    public static void plotHashMap(Map<String, Token> map) throws Exception {
-        int l = map.size();
-        double [] x = new double[l];
-        double [] y = new double[l];
+    public static void getArraysFromMap(Map<String, Token> map, double [] x, double [] y) {
         int i=0;
         for(String word: map.keySet()) {
             x[i] = i+1;
             y[i] = map.get(word).getValue();
             i++;
         }
-        plotXYArray(x, y);
     }
 
-    public static void plotXYArray(double [] xData, double [] yData)  throws Exception {
-        // Create Chart
-        XYChart chart = QuickChart.getChart("Sample Chart", "X", "Y", "y(x)", xData, yData);
-        // Show it
-        new SwingWrapper(chart).displayChart();
+    public static void get2DArrayFromMap(Map<String, Token> map, double [][] data) {
+        int i=0;
+        for(String word: map.keySet()) {
+            data[i][0] = i+1;
+            data[i][1] = map.get(word).getValue();
+            i++;
+        }
     }
 }

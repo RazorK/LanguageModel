@@ -269,13 +269,15 @@ public class DocAnalyzer {
 
         sortedMap = MapUtils.sortByTokenValue(analyzer.m_stats);
         double [][] data = new double[sortedMap.size()][2];
-        MapUtils.get2DArrayFromMap(sortedMap, data);
+        MapUtils.getLog2DArrayFromMap(sortedMap, data);
 
-        SimpleRegression regression = new SimpleRegression();
+        SimpleRegression regression = new SimpleRegression(true);
         regression.addData(data);
         System.out.println("Linear Regression Slope: "+ regression.getSlope());
-        System.out.println("Linear Regression Interception" + regression.getIntercept());
+        System.out.println("Linear Regression Interception: " + regression.getIntercept());
+
         // MapUtils.exportMap(sortedMap, "./test");
         PlotUtils.plotHashMap(sortedMap);
+        PlotUtils.plot2DArray(data);
     }
 }

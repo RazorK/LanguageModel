@@ -88,12 +88,20 @@ public class MapUtils {
         }
     }
 
-    public static void get2DArrayFromMap(Map<String, Token> map, double [][] data) {
+    public static void getLog2DArrayFromMap(Map<String, Token> map, double [][] data) {
         int i=0;
         for(String word: map.keySet()) {
-            data[i][0] = i+1;
-            data[i][1] = map.get(word).getValue();
+            data[i][0] = Math.log(i+1);
+            data[i][1] = Math.log(map.get(word).getValue());
             i++;
         }
     }
+
+    public static void seperate2D(double [][] data, double [] xData, double [] yData) {
+        for(int i=0; i<data.length; i++) {
+            xData[i] = data[i][0];
+            yData[i] = data[i][1];
+        }
+    }
+
 }

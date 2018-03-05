@@ -1,10 +1,4 @@
-import org.knowm.xchart.SwingWrapper;
-import org.knowm.xchart.XYChart;
-import org.knowm.xchart.XYChartBuilder;
-import org.knowm.xchart.style.Styler;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.apache.commons.math3.stat.regression.SimpleRegression;
 
 /**
  * Created by Raz on 2018/3/2.
@@ -13,35 +7,22 @@ import java.util.List;
 public class Test {
 
     public static void main(String[] args) {
-        new SwingWrapper(getChart()).displayChart();
-    }
+        double[][] data = { { 1, 3 }, {2, 5 }, {3, 7 }, {4, 9 }, {5, 11 }};
+        SimpleRegression regression = new SimpleRegression(true);
+        //the argument, false, tells the class not to include a constant
+        regression.addData(data);
 
-    public static XYChart getChart() {
+        System.out.println(regression.getIntercept());
+        // displays intercept of regression line, since we have constrained the constant, 0.0 is returned
 
-        // generates Log data
-        List<Integer> xData = new ArrayList<Integer>();
-        List<Double> yData = new ArrayList<Double>();
-        for (int i = -3; i <= 3; i++) {
-            xData.add(i);
-            yData.add(Math.pow(10, i));
-        }
+        System.out.println(regression.getSlope());
+        // displays slope of regression line
 
-        // Create Chart
-        XYChart chart = new XYChartBuilder().width(800).height(600).title("Powers of Ten").xAxisTitle("Power").yAxisTitle("Value").build();
+        System.out.println(regression.getSlopeStdErr());
+        // displays slope standard error
 
-        // Customize Chart
-        chart.getStyler().setChartTitleVisible(true);
-        chart.getStyler().setLegendPosition(Styler.LegendPosition.InsideNW);
-        chart.getStyler().setYAxisLogarithmic(true);
-        chart.getStyler().setXAxisLabelRotation(45);
+        System.out.println(regression.getInterceptStdErr() );
+        // will return Double.NaN, since we constrained the parameter to zero
 
-        // chart.getStyler().setXAxisLabelAlignment(TextAlignment.Right);
-        // chart.getStyler().setXAxisLabelRotation(90);
-        // chart.getStyler().setXAxisLabelRotation(0);
-
-        // Series
-        chart.addSeries("10^x", xData, yData);
-
-        return chart;
     }
 }

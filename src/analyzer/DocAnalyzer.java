@@ -9,12 +9,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.*;
 
-import org.apache.commons.math3.stat.regression.SimpleRegression;
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
 import org.tartarus.snowball.ext.porterStemmer;
@@ -42,6 +38,9 @@ public class DocAnalyzer {
     //N-gram to be created
     int m_N;
 
+    //a hashset of punctuation
+    HashSet<Character> m_punctuation;
+
     //a list of stopwords
     HashSet<String> m_stopwords;
 
@@ -51,16 +50,16 @@ public class DocAnalyzer {
     //you might need something like this to store the counting statistics for validating Zipf's and computing IDF
     HashMap<String, Token> m_stats;
 
+    HashSet<String> m_vol;
+
     //we have also provided a sample implementation of language model in src.structures.LanguageModel
     Tokenizer m_tokenizer;
 
     //this structure is for language modeling
     LanguageModel m_langModel;
 
-    //a hashset of punctuation
-    HashSet<Character> m_punctuation;
 
-    public DocAnalyzer(String tokenModel, String puncFileAddress, String stopWordsAddress, int N) throws InvalidFormatException, FileNotFoundException, IOException {
+    public DocAnalyzer(String tokenModel, String puncFileAddress, int N) throws InvalidFormatException, FileNotFoundException, IOException {
         m_N = N;
         m_reviews = new ArrayList<Post>();
         m_punctuation = new HashSet<>();
@@ -70,7 +69,6 @@ public class DocAnalyzer {
         m_stats = new HashMap<>();
 
         loadPunctuation(puncFileAddress);
-        loadStopwords(stopWordsAddress);
     }
 
     public void loadPunctuation(String filename) {
@@ -98,7 +96,8 @@ public class DocAnalyzer {
             while ((line = reader.readLine()) != null) {
                 //it is very important that you perform the same processing operation to the loaded stopwords
                 //otherwise it won't be matched in the text content
-                line = SnowballStemming(Normalization(line));
+                line = Normalization(line);
+                line = SnowballStemming(line);
                 if (!line.isEmpty())
                     m_stopwords.add(line);
             }
@@ -109,33 +108,98 @@ public class DocAnalyzer {
         }
     }
 
+    public void addStopwords(Map<String, Token> sortedMap, int num) {
+        int counter = 0;
+        System.out.println("----------------Printing New Stopwords-----------------");
+        for(String word: sortedMap.keySet()) {
+            if(counter >= num) break;
+            if(!m_stopwords.contains(word)) {
+                m_stopwords.add(word);
+                System.out.println(counter + "," + word);
+                counter++;
+            }
+        }
+    }
+
+    public void applyStopwords() {
+        Set<String> clone = new HashSet<>(m_stats.keySet());
+        for(String word: clone) {
+            if(m_stopwords.contains(word))
+                m_stats.remove(word);
+        }
+    }
+
+    // must be called after stopwords constructed.
+    public void constructVal() {
+        m_vol = new HashSet<>();
+        for(String word : m_stats.keySet()) {
+            if(!m_stopwords.contains(word)) {
+                m_vol.add(word);
+            }
+        }
+    }
+
     public void analyzeDocument(JSONObject json) {
         try {
             JSONArray jarray = json.getJSONArray("Reviews");
             for (int i = 0; i < jarray.length(); i++) {
-                Post review = new Post(jarray.getJSONObject(i));
-                String[] tokens = Tokenize(review.getContent());
-                review.setTokens(tokens);
+                    Post review = new Post(jarray.getJSONObject(i));
+                    String[] tokens = Tokenize(review.getContent());
+                    review.setTokens(tokens);
 
-                /**
-                 * HINT: perform necessary text processing here based on the tokenization results
-                 * e.g., tokens -> normalization -> stemming -> N-gram -> stopword removal -> to vector
-                 * The Post class has defined a "HashMap<String, Token> m_vector" field to hold the vector representation
-                 * For efficiency purpose, you can accumulate a term's DF here as well
-                 */
+                    /**
+                     * HINT: perform necessary text processing here based on the tokenization results
+                     * e.g., tokens -> normalization -> stemming -> N-gram -> stopword removal -> to vector
+                     * The Post class has defined a "HashMap<String, Token> m_vector" field to hold the vector representation
+                     * For efficiency purpose, you can accumulate a term's DF here as well
+                     */
+                    HashSet<String> doc_df = new HashSet<>();
 
-                for(String word : tokens) {
+                String [] nom = new String[tokens.length];
+                for(int j=0; j<tokens.length; j++) {
+                    String word = tokens[j];
                     word = Normalization(word);
                     word = SnowballStemming(word);
+                    nom[j] = word;
+                }
+
+                //TODO remove empty
+                nom = MapUtils.removeEmpty(nom);
+                if(nom.length == 0) return;
+
+                String [] newTokens = new String[nom.length + nom.length-1];
+                for(int j=0; j<nom.length; j++) {
+                    newTokens[j] = nom[j];
+                }
+                for(int j=0; j<nom.length-1; j++) {
+                    newTokens[nom.length+ j] = nom[j] + "-" + nom[j+1];
+                }
+
+                for(String word : newTokens) {
                     if(m_stats.containsKey(word)) {
                         Token temp = m_stats.get(word);
-                        temp.setValue(temp.getValue()+1);
+
+                        temp.setTTFValue(temp.getTTFValue()+1);
                     } else {
                         Token temp = new Token(word);
-                        temp.setValue(1);
+
+                        temp.setTTFValue(1);
+
                         m_stats.put(word, temp);
                     }
+
+                    if(!doc_df.contains(word)) {
+                        doc_df.add(word);
+                    }
                 }
+
+                for(String word: doc_df) {
+                    if(m_stats.containsKey(word)) {
+                        Token t = m_stats.get(word);
+                        t.setDFValue(t.getDFValue()+1);
+                    }
+                }
+
                 m_reviews.add(review);
             }
         } catch (JSONException e) {
@@ -226,7 +290,7 @@ public class DocAnalyzer {
         StringBuilder sb = new StringBuilder(token);
         for(int i=0; i<sb.length(); i++) {
             if(m_punctuation.contains(sb.charAt(i))) {
-                sb.deleteCharAt(i);
+                sb.deleteCharAt(i--);
             }
         }
         token = sb.toString();
@@ -256,28 +320,44 @@ public class DocAnalyzer {
         DocAnalyzer analyzer = new DocAnalyzer(
                 "./data/Model/en-token.bin",
                 "./data/punctuation",
-                "./data/stopwords",
                 2);
         //code for demonstrating tokenization and stemming
-        //analyzer.TokenizerDemon("I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
+        //analyzer.TokenizerDemon("whatever I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
 
         //entry point to deal with a collection of documents
 
-        Map<String, Token> sortedMap;
         analyzer.LoadDirectory("./Data/yelp/train", ".json");
-        analyzer.LoadDirectory("./Data/yelp/test", ".json");
+        // analyzer.LoadDirectory("./Data/yelp/test", ".json");
 
-        sortedMap = MapUtils.sortByTokenValue(analyzer.m_stats);
-        double [][] data = new double[sortedMap.size()][2];
-        MapUtils.getLog2DArrayFromMap(sortedMap, data);
+        // P1 1.1
+        Map<String, Token> sortedMap;
 
-        SimpleRegression regression = new SimpleRegression(true);
-        regression.addData(data);
-        System.out.println("Linear Regression Slope: "+ regression.getSlope());
-        System.out.println("Linear Regression Interception: " + regression.getIntercept());
-
+        // sortedMap = MapUtils.sortByTokenValue(analyzer.m_stats);
         // MapUtils.exportMap(sortedMap, "./test");
-        PlotUtils.plotHashMap(sortedMap);
-        PlotUtils.plot2DArray(data);
+        // MapUtils.printRegression(sortedMap);
+        // PlotUtils.plotHashMap(sortedMap);
+
+        // p1 1.2
+        analyzer.loadStopwords("./data/stopwords");
+
+        sortedMap = MapUtils.sortByDf(analyzer.m_stats);
+        analyzer.addStopwords(sortedMap, 100);
+
+        analyzer.constructVal();
+        System.out.println(analyzer.m_vol.size());
+
+        // change to directly remove from m_stats
+        analyzer.applyStopwords();
+        System.out.println(analyzer.m_stats.size());
+        sortedMap = MapUtils.sortByDf(analyzer.m_stats);
+
+        Object [] entryArray = sortedMap.entrySet().toArray();
+        for(int i=0; i<100; i++) {
+            int index = i>=50?entryArray.length-1-(i-50):i;
+            Map.Entry<String, Token> entry = (Map.Entry<String, Token>) entryArray[index];
+            System.out.println(index + "," + entry.getKey() + "," +entry.getValue().getIDFValue(analyzer.m_reviews.size()));
+        }
+
+
     }
 }

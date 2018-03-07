@@ -49,12 +49,14 @@ public class Token {
         this.m_df_value = m_df_value;
     }
 
+    double m_idf_value;
     //default constructor
     public Token(String token) {
         m_token = token;
         m_id = -1;
         m_ttf_value = 0;
         m_df_value = 0;
+        m_idf_value = 0;
     }
 
     //default constructor
@@ -63,11 +65,20 @@ public class Token {
         m_id = id;
         m_ttf_value = 0;
         m_df_value = 0;
+        m_idf_value = 0;
     }
 
-    public double getIDFValue(int total) {
-        if(m_df_value != 0)
-            return 1+Math.log(total/m_df_value);
-        return -1;
+    public double getIDFValue() {
+        return m_idf_value;
+    }
+
+    public void setIDF(int total) {
+        if(m_df_value != 0){
+            m_idf_value = 1+Math.log(total/m_df_value);
+        }
+    }
+
+    public void setIDFValue(double idf) {
+        m_idf_value = idf;
     }
 }

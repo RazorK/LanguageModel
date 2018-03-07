@@ -49,10 +49,11 @@ public class LanguageModel {
 	
 	//We have provided you a simple implementation based on unigram language model, please extend it to bigram (i.e., controlled by m_N)
 	public double logLikelihood(Post review) {
-		double likelihood = 0;
-		for(String token:review.getTokens()) {
-			likelihood += Math.log(calcLinearSmoothedProb(token));
-		}
-		return likelihood;
+//		double likelihood = 0;
+//		for(String token:review.getTokens()) {
+//			likelihood += Math.log(calcLinearSmoothedProb(token));
+//		}
+//		return likelihood;
+		return 0;
 	}
 }

@@ -91,28 +91,79 @@ public class Post {
         m_ID = ID;
     }
 
-    String[] m_tokens; // we will store the tokens
-
-    public String[] getTokens() {
-        return m_tokens;
+    public VectorWeight[] getVec() {
+        return vec;
     }
 
-    public void setTokens(String[] tokens) {
-        m_tokens = tokens;
+    public void setVecFromTokens(String [] tokens, HashMap<String, Token> map) {
+        vec = new VectorWeight[indexMap.size()];
+        if(tokens == null || tokens.length == 0) return;
+        for(String word: tokens) {
+            if(!indexMap.containsKey(word)) continue;
+            int index = indexMap.get(word);
+            if(vec[index] == null) {
+                VectorWeight insert = new VectorWeight(word);
+                insert.setTF(1);
+                insert.setIDF(map.get(word).getIDFValue());
+                vec[index] = insert;
+            } else {
+                vec[index].setTF(vec[index].getTF()+1);
+            }
+        }
     }
 
-    HashMap<String, Token> m_vector; // suggested sparse structure for storing the vector space representation with N-grams for this document
+    VectorWeight [] vec;
 
-    public HashMap<String, Token> getVct() {
-        return m_vector;
+    public HashMap<String, Integer> getIndexMap() {
+        return indexMap;
     }
 
-    public void setVct(HashMap<String, Token> vct) {
-        m_vector = vct;
+    public void setIndexMap(HashMap<String, Integer> indexMap) {
+        this.indexMap = indexMap;
     }
+
+    HashMap<String, Integer> indexMap;
 
     public double similiarity(Post p) {
-        return 0;//compute the cosine similarity between this post and input p based on their vector space representation
+        //compute the cosine similarity between this post and input p based on their vector space representation
+        if(indexMap != p.indexMap){
+            throw new java.lang.Error("Size not the same, can not calculate similarity");
+        }
+
+        double res = 0;
+        for(int i=0; i<vec.length; i++) {
+            if(vec[i]!=null && p.vec[i]!=null) {
+                res+=vec[i].getWeight() * p.vec[i].getWeight();
+            }
+        }
+        return res/(getLength()*p.getLength());
+    }
+
+    public double getLength() {
+        double res = 0;
+        for(int i=0; i<vec.length; i++) {
+            if(vec[i]!=null)
+                res+= Math.pow(vec[i].getWeight(), 2);
+        }
+        return Math.sqrt(res);
+    }
+
+    // candidate
+    double candidateSim;
+    public void setCandidateValue(double i) {
+        candidateSim = i;
+    }
+
+    public double getCandidateSim() {
+        return candidateSim;
+    }
+
+    public void printPost() {
+        System.out.println("------------------Start Print Post------------------");
+        System.out.println("Author: " + getAuthor());
+        System.out.println("Data: " + getDate());
+        System.out.println("Content: " + getContent());
+        System.out.println("ReviewID: "+ m_ID );
     }
 
     public Post(JSONObject json) {

@@ -3,14 +3,11 @@
  */
 package analyzer;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.*;
 
+import javafx.geometry.Pos;
+import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
 import org.tartarus.snowball.ext.porterStemmer;
@@ -47,8 +44,12 @@ public class DocAnalyzer {
     //you can store the loaded reviews in this arraylist for further processing
     ArrayList<Post> m_reviews;
 
+    ArrayList<Post> m_test;
+
     //you might need something like this to store the counting statistics for validating Zipf's and computing IDF
     HashMap<String, Token> m_stats;
+
+    HashMap<String, Integer> m_index_map;
 
     HashSet<String> m_vol;
 
@@ -62,6 +63,7 @@ public class DocAnalyzer {
     public DocAnalyzer(String tokenModel, String puncFileAddress, int N) throws InvalidFormatException, FileNotFoundException, IOException {
         m_N = N;
         m_reviews = new ArrayList<Post>();
+        m_test = new ArrayList<>();
         m_punctuation = new HashSet<>();
         m_stopwords = new HashSet<>();
         m_tokenizer = new TokenizerME(new TokenizerModel(new FileInputStream(tokenModel)));
@@ -122,10 +124,22 @@ public class DocAnalyzer {
     }
 
     public void applyStopwords() {
+        // TODO this can be improve by traverse stopword hashset.
         Set<String> clone = new HashSet<>(m_stats.keySet());
         for(String word: clone) {
             if(m_stopwords.contains(word))
                 m_stats.remove(word);
+        }
+    }
+
+    public void removeRareWords() {
+        Set<String> s = new HashSet<>(m_stats.keySet());
+        for(String w: s) {
+            if(!m_stats.containsKey(w)) continue;;
+            Token t = m_stats.get(w);
+            if(t.getDFValue()<50) {
+                m_stats.remove(w);
+            }
         }
     }
 
@@ -139,21 +153,27 @@ public class DocAnalyzer {
         }
     }
 
+    public void applyIDF(int total) {
+        for(Map.Entry<String, Token> en: m_stats.entrySet()) {
+            en.getValue().setIDF(total);
+        }
+    }
+
     public void analyzeDocument(JSONObject json) {
         try {
             JSONArray jarray = json.getJSONArray("Reviews");
             for (int i = 0; i < jarray.length(); i++) {
-                    Post review = new Post(jarray.getJSONObject(i));
-                    String[] tokens = Tokenize(review.getContent());
-                    review.setTokens(tokens);
+                Post review = new Post(jarray.getJSONObject(i));
+                String[] tokens = Tokenize(review.getContent());
+                // review.setTokens(tokens);
 
-                    /**
-                     * HINT: perform necessary text processing here based on the tokenization results
-                     * e.g., tokens -> normalization -> stemming -> N-gram -> stopword removal -> to vector
-                     * The Post class has defined a "HashMap<String, Token> m_vector" field to hold the vector representation
-                     * For efficiency purpose, you can accumulate a term's DF here as well
-                     */
-                    HashSet<String> doc_df = new HashSet<>();
+                /**
+                 * HINT: perform necessary text processing here based on the tokenization results
+                 * e.g., tokens -> normalization -> stemming -> N-gram -> stopword removal -> to vector
+                 * The Post class has defined a "HashMap<String, Token> m_vector" field to hold the vector representation
+                 * For efficiency purpose, you can accumulate a term's DF here as well
+                 */
+                HashSet<String> doc_df = new HashSet<>();
 
                 String [] nom = new String[tokens.length];
                 for(int j=0; j<tokens.length; j++) {
@@ -207,6 +227,16 @@ public class DocAnalyzer {
         }
     }
 
+    public void generateIndexMap() {
+        m_index_map = new HashMap<>();
+        int index = 0;
+        for(String word: m_stats.keySet()) {
+            if(!m_index_map.containsKey(word)) {
+                m_index_map.put(word, index++);
+            }
+        }
+    }
+
     public void createLanguageModel() {
         m_langModel = new LanguageModel(m_N, m_stats.size());
 
@@ -220,7 +250,7 @@ public class DocAnalyzer {
     }
 
     //sample code for loading a json file
-    public JSONObject LoadJson(String filename) {
+    public static JSONObject LoadJson(String filename) {
         try {
             BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(filename), "UTF-8"));
             StringBuffer buffer = new StringBuffer(1024);
@@ -258,6 +288,63 @@ public class DocAnalyzer {
         }
         size = m_reviews.size() - size;
         System.out.println("Loading " + size + " review documents from " + folder);
+    }
+
+    public void loadTest(String folder, String suffix) {
+        File dir = new File(folder);
+        for (File f : dir.listFiles()) {
+            if (f.isFile() && f.getName().endsWith(suffix))
+                analyzeTest(LoadJson(f.getAbsolutePath()));
+            else if (f.isDirectory())
+                LoadDirectory(f.getAbsolutePath(), suffix);
+            System.out.println(m_test.size());
+        }
+    }
+
+    public void analyzeTest(JSONObject json) {
+        try {
+            JSONArray jarray = json.getJSONArray("Reviews");
+            for (int i = 0; i < jarray.length(); i++) {
+                Post review = getPostFromJson(jarray.getJSONObject(i));
+                m_test.add(review);
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public Post getPostFromJson(JSONObject json) {
+        Post review = new Post(json);
+        review.setIndexMap(m_index_map);
+        String [] newTokens = getTokens(review.getContent());
+        review.setVecFromTokens(newTokens, m_stats);
+        return review;
+    }
+
+    public String [] getTokens(String content) {
+        String[] tokens = Tokenize(content);
+        String [] nom = new String[tokens.length];
+        for(int j=0; j<tokens.length; j++) {
+            String word = tokens[j];
+            word = Normalization(word);
+            word = SnowballStemming(word);
+            nom[j] = word;
+        }
+
+        //TODO remove empty
+        nom = MapUtils.removeEmpty(nom);
+        if(nom.length == 0) return null;
+
+        String [] newTokens = new String[nom.length + nom.length-1];
+        for(int j=0; j<nom.length; j++) {
+            newTokens[j] = nom[j];
+        }
+
+        for(int j=0; j<nom.length-1; j++) {
+            newTokens[nom.length+ j] = nom[j] + "-" + nom[j+1];
+        }
+
+        return newTokens;
     }
 
     //sample code for demonstrating how to use Snowball stemmer
@@ -316,7 +403,38 @@ public class DocAnalyzer {
         }
     }
 
-    public static void main(String[] args) throws Exception {
+    public void storeMSTATS(String filename) throws IOException {
+        File file = new File(filename);
+        synchronized (file) {
+            FileWriter fw = new FileWriter(filename);
+            for(Map.Entry<String, Token> e : m_stats.entrySet()) {
+                String word = e.getKey();
+                Token t = e.getValue();
+                fw.write( word + ","+ t.getTTFValue() + "," + t.getDFValue() + "," + t.getIDFValue()+"\n");
+            }
+            fw.close();
+        }
+    }
+
+    public void recoverMSTATS(String filename) {
+        try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                String[] fn = line.split(",");
+                Token t = new Token(fn[0]);
+                t.setTTFValue(Double.parseDouble(fn[1]));
+                t.setDFValue(Double.parseDouble(fn[2]));
+                t.setIDFValue(Double.parseDouble(fn[3]));
+                m_stats.put(fn[0], t);
+            }
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void orimain(String [] args) throws Exception {
         DocAnalyzer analyzer = new DocAnalyzer(
                 "./data/Model/en-token.bin",
                 "./data/punctuation",
@@ -343,21 +461,92 @@ public class DocAnalyzer {
         sortedMap = MapUtils.sortByDf(analyzer.m_stats);
         analyzer.addStopwords(sortedMap, 100);
 
-        analyzer.constructVal();
-        System.out.println(analyzer.m_vol.size());
+        //analyzer.constructVal();
 
         // change to directly remove from m_stats
+        System.out.println(analyzer.m_stats.size());
         analyzer.applyStopwords();
+
+        System.out.println(analyzer.m_stats.size());
+        analyzer.removeRareWords();
+
+
         System.out.println(analyzer.m_stats.size());
         sortedMap = MapUtils.sortByDf(analyzer.m_stats);
+
+        System.out.println(analyzer.m_reviews.size());
+        analyzer.applyIDF(analyzer.m_reviews.size());
 
         Object [] entryArray = sortedMap.entrySet().toArray();
         for(int i=0; i<100; i++) {
             int index = i>=50?entryArray.length-1-(i-50):i;
             Map.Entry<String, Token> entry = (Map.Entry<String, Token>) entryArray[index];
-            System.out.println(index + "," + entry.getKey() + "," +entry.getValue().getIDFValue(analyzer.m_reviews.size()));
+
+            System.out.println(index + "," + entry.getKey() + "," +entry.getValue().getIDFValue());
         }
 
+        analyzer.applyIDF(analyzer.m_reviews.size());
+        analyzer.storeMSTATS("./test");
+    }
 
+    public static void main(String[] args) throws Exception {
+        DocAnalyzer analyzer = new DocAnalyzer(
+                "./data/Model/en-token.bin",
+                "./data/punctuation",
+                2);
+
+        analyzer.recoverMSTATS("./test");
+
+//        // p1 1.3
+//        analyzer.applyIDF(analyzer.m_reviews.size());
+
+
+        // indexMap
+        analyzer.generateIndexMap();
+
+        analyzer.loadTest("./data/yelp/test", ".json");
+
+        // query
+        JSONObject query = LoadJson("./data/query.json");
+
+//        Comparator<Post> comp = new Comparator<Post>() {
+//            @Override
+//            public int compare(Post l, Post r) {
+//                if(l.getCandidateSim() == r.getCandidateSim()) return 0;
+//                if(l.getCandidateSim() < r.getCandidateSim()) return -1;
+//                else if(l.getCandidateSim()>r.getCandidateSim()) return 1;
+//                return 0;
+//            }
+//        };
+
+        JSONArray jarray = query.getJSONArray("Reviews");
+        for (int i = 0; i < jarray.length(); i++) {
+            Post q = analyzer.getPostFromJson(jarray.getJSONObject(i));
+            Post [] max = new Post[3];
+            for(Post can: analyzer.m_test) {
+                double simi = q.similiarity(can);
+                can.setCandidateValue(simi);
+                insertHelper(max, can);
+            }
+            System.out.println("=========================================================");
+            System.out.println("Printing Corresponding Post for query" + i);
+            for(int j=0; j<max.length; j++) {
+                max[j].printPost();
+                System.out.println("Cosine Similarity: " + max[j].getCandidateSim());
+            }
+        }
+    }
+
+    public static void insertHelper(Post [] max, Post insert) {
+        for(int i=0; i<max.length; i++) {
+            if(max[i] == null){
+                max[i] = insert;
+                return;
+            }
+            if(max[i].getCandidateSim()<insert.getCandidateSim()) {
+                max[i] = insert;
+                return;
+            }
+        }
     }
 }

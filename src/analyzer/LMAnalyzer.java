@@ -522,6 +522,4 @@ public class LMAnalyzer {
         double sdv = sd.evaluate(pers);
         System.out.println("Mean: "+m+", Standard Deviation: "+sdv);
     }
-
-
 }

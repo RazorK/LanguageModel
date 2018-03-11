@@ -146,4 +146,15 @@ public class MapUtils {
         String [] res = temp.toArray(new String[temp.size()]);
         return res;
     }
+
+    public static String [] removeStopwords(String [] tokens, HashSet<String> stop) {
+        List<String> after = new LinkedList<>();
+        for(String word: tokens) {
+            if(!stop.contains(word)) {
+                after.add(word);
+            }
+        }
+        String [] res = after.toArray(new String[after.size()]);
+        return res;
+    }
 }

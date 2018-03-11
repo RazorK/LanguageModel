@@ -192,4 +192,14 @@ public class Post {
 
         return json;
     }
+
+    public String[] getTokens() {
+        return tokens;
+    }
+
+    public void setTokens(String[] tokens) {
+        this.tokens = tokens;
+    }
+
+    String [] tokens;
 }

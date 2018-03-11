@@ -1,17 +1,6 @@
-/**
- *
- */
 package analyzer;
 
-import java.io.*;
-import java.util.*;
-
 import javafx.geometry.Pos;
-import org.omg.PortableInterceptor.SYSTEM_EXCEPTION;
-import org.tartarus.snowball.SnowballStemmer;
-import org.tartarus.snowball.ext.englishStemmer;
-import org.tartarus.snowball.ext.porterStemmer;
-
 import json.JSONArray;
 import json.JSONException;
 import json.JSONObject;
@@ -19,19 +8,21 @@ import opennlp.tools.tokenize.Tokenizer;
 import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
 import opennlp.tools.util.InvalidFormatException;
+import org.apache.commons.math3.stat.descriptive.moment.Mean;
+import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
+import org.tartarus.snowball.SnowballStemmer;
+import org.tartarus.snowball.ext.englishStemmer;
+import org.tartarus.snowball.ext.porterStemmer;
+import structures.BigramLM;
 import structures.LanguageModel;
 import structures.Post;
 import structures.Token;
 import utils.MapUtils;
-import utils.PlotUtils;
 
-/**
- * @author hongning
- *         Sample codes for demonstrating OpenNLP package usage
- *         NOTE: the code here is only for demonstration purpose,
- *         please revise it accordingly to maximize your implementation's efficiency!
- */
-public class DocAnalyzer {
+import java.io.*;
+import java.util.*;
+
+public class LMAnalyzer {
     //N-gram to be created
     int m_N;
 
@@ -60,7 +51,7 @@ public class DocAnalyzer {
     LanguageModel m_langModel;
 
 
-    public DocAnalyzer(String tokenModel, String puncFileAddress, int N) throws InvalidFormatException, FileNotFoundException, IOException {
+    public LMAnalyzer(String tokenModel, String puncFileAddress, String stopwordAdd, int N) throws InvalidFormatException, FileNotFoundException, IOException {
         m_N = N;
         m_reviews = new ArrayList<Post>();
         m_test = new ArrayList<>();
@@ -70,7 +61,11 @@ public class DocAnalyzer {
 
         m_stats = new HashMap<>();
 
+        //tricky
+        m_stopwords.add("NUM");
+
         loadPunctuation(puncFileAddress);
+        loadStopwords(stopwordAdd);
     }
 
     public void loadPunctuation(String filename) {
@@ -89,8 +84,6 @@ public class DocAnalyzer {
         }
     }
 
-    //sample code for loading a list of stopwords from file
-    //you can manually modify the stopword file to include your newly selected words
     public void loadStopwords(String filename) {
         try {
             BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(filename), "UTF-8"));
@@ -124,10 +117,9 @@ public class DocAnalyzer {
     }
 
     public void applyStopwords() {
-        // TODO this can be improve by traverse stopword hashset.
-        Set<String> clone = new HashSet<>(m_stats.keySet());
+        Set<String> clone = new HashSet<>(m_stopwords);
         for(String word: clone) {
-            if(m_stopwords.contains(word))
+            if(m_stats.keySet().contains(word))
                 m_stats.remove(word);
         }
     }
@@ -173,7 +165,6 @@ public class DocAnalyzer {
                  * The Post class has defined a "HashMap<String, Token> m_vector" field to hold the vector representation
                  * For efficiency purpose, you can accumulate a term's DF here as well
                  */
-                HashSet<String> doc_df = new HashSet<>();
 
                 String [] nom = new String[tokens.length];
                 for(int j=0; j<tokens.length; j++) {
@@ -187,36 +178,15 @@ public class DocAnalyzer {
                 nom = MapUtils.removeEmpty(nom);
                 if(nom.length == 0) return;
 
-                String [] newTokens = new String[nom.length + nom.length-1];
-                for(int j=0; j<nom.length; j++) {
-                    newTokens[j] = nom[j];
-                }
-                for(int j=0; j<nom.length-1; j++) {
-                    newTokens[nom.length+ j] = nom[j] + "-" + nom[j+1];
-                }
-
-                for(String word : newTokens) {
-                    if(m_stats.containsKey(word)) {
-                        Token temp = m_stats.get(word);
-
-                        temp.setTTFValue(temp.getTTFValue()+1);
-                    } else {
-                        Token temp = new Token(word);
-
-                        temp.setTTFValue(1);
-
-                        m_stats.put(word, temp);
+                if(m_N == 1) {
+                    for(String word : nom) {
+                        if(m_stopwords.contains(word)) continue;
+                        m_langModel.addOneToModel(word);
                     }
-
-                    if(!doc_df.contains(word)) {
-                        doc_df.add(word);
-                    }
-                }
-
-                for(String word: doc_df) {
-                    if(m_stats.containsKey(word)) {
-                        Token t = m_stats.get(word);
-                        t.setDFValue(t.getDFValue()+1);
+                } else {
+                    for(int j=0; j<nom.length-1; j++) {
+                        if(m_stopwords.contains(nom[j+1])) continue;
+                        ((BigramLM)m_langModel).addOneToModel(nom[j], nom[j+1]);
                     }
                 }
 
@@ -227,25 +197,29 @@ public class DocAnalyzer {
         }
     }
 
-    public void generateIndexMap() {
-        m_index_map = new HashMap<>();
-        int index = 0;
-        for(String word: m_stats.keySet()) {
-            if(!m_index_map.containsKey(word)) {
-                m_index_map.put(word, index++);
-            }
-        }
-    }
-
-    public void createLanguageModel() {
+    public void createLanguageModel(String train) {
         m_langModel = new LanguageModel(m_N);
 
-        for (Post review : m_reviews) {
-            String[] tokens = Tokenize(review.getContent());
-            /**
-             * HINT: essentially you will perform very similar operations as what you have done in analyzeDocument()
-             * Now you should properly update the counts in LanguageModel structure such that we can perform maximum likelihood estimation on it
-             */
+        LoadDirectory(train, ".json");
+
+        m_langModel.processModel();
+    }
+
+    /**
+     * createLM
+     * @param train
+     * @param type 0 for linear, 1 for absolute
+     */
+    public void createLanguageModel(String train, LanguageModel ref, int type, double para) throws Exception {
+        if(m_N == 1) throw new Exception("m_N can not be 1");
+        m_langModel = new BigramLM(m_N, ref, type);
+
+        LoadDirectory(train, ".json");
+
+        if(type == 0) {
+            ((BigramLM)m_langModel).processLinear(para);
+        } else if(type == 1) {
+            ((BigramLM)m_langModel).processAbsolute(para);
         }
     }
 
@@ -305,7 +279,24 @@ public class DocAnalyzer {
         try {
             JSONArray jarray = json.getJSONArray("Reviews");
             for (int i = 0; i < jarray.length(); i++) {
-                Post review = getPostFromJson(jarray.getJSONObject(i));
+                Post review =new Post(jarray.getJSONObject(i));
+                String[] tokens = Tokenize(review.getContent());
+
+                String [] nom = new String[tokens.length];
+                for(int j=0; j<tokens.length; j++) {
+                    String word = tokens[j];
+                    word = Normalization(word);
+                    word = SnowballStemming(word);
+                    nom[j] = word;
+                }
+
+                //TODO remove empty
+                nom = MapUtils.removeEmpty(nom);
+                if(nom.length == 0) return;
+
+                // remove stopWords
+                String [] removed = MapUtils.removeStopwords(nom, m_stopwords);
+                review.setTokens(removed);
                 m_test.add(review);
             }
         } catch (JSONException e) {
@@ -434,109 +425,6 @@ public class DocAnalyzer {
         }
     }
 
-    public static void orimain(String [] args) throws Exception {
-        DocAnalyzer analyzer = new DocAnalyzer(
-                "./data/Model/en-token.bin",
-                "./data/punctuation",
-                2);
-        //code for demonstrating tokenization and stemming
-        //analyzer.TokenizerDemon("whatever I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
-
-        //entry point to deal with a collection of documents
-
-        analyzer.LoadDirectory("./Data/yelp/train", ".json");
-        // analyzer.LoadDirectory("./Data/yelp/test", ".json");
-
-        // P1 1.1
-        Map<String, Token> sortedMap;
-
-        // sortedMap = MapUtils.sortByTokenValue(analyzer.m_stats);
-        // MapUtils.exportMap(sortedMap, "./test");
-        // MapUtils.printRegression(sortedMap);
-        // PlotUtils.plotHashMap(sortedMap);
-
-        // p1 1.2
-        analyzer.loadStopwords("./data/stopwords");
-
-        sortedMap = MapUtils.sortByDf(analyzer.m_stats);
-        analyzer.addStopwords(sortedMap, 100);
-
-        //analyzer.constructVal();
-
-        // change to directly remove from m_stats
-        System.out.println(analyzer.m_stats.size());
-        analyzer.applyStopwords();
-
-        System.out.println(analyzer.m_stats.size());
-        analyzer.removeRareWords();
-
-
-        System.out.println(analyzer.m_stats.size());
-        sortedMap = MapUtils.sortByDf(analyzer.m_stats);
-
-        System.out.println(analyzer.m_reviews.size());
-        analyzer.applyIDF(analyzer.m_reviews.size());
-
-        Object [] entryArray = sortedMap.entrySet().toArray();
-        for(int i=0; i<100; i++) {
-            int index = i>=50?entryArray.length-1-(i-50):i;
-            Map.Entry<String, Token> entry = (Map.Entry<String, Token>) entryArray[index];
-
-            System.out.println(index + "," + entry.getKey() + "," +entry.getValue().getIDFValue());
-        }
-
-        analyzer.applyIDF(analyzer.m_reviews.size());
-        analyzer.storeMSTATS("./test");
-    }
-
-    public static void part1(String[] args) throws Exception {
-        DocAnalyzer analyzer = new DocAnalyzer(
-                "./data/Model/en-token.bin",
-                "./data/punctuation",
-                2);
-
-        analyzer.recoverMSTATS("./test");
-
-//        // p1 1.3
-//        analyzer.applyIDF(analyzer.m_reviews.size());
-
-
-        // indexMap
-        analyzer.generateIndexMap();
-
-        analyzer.loadTest("./data/yelp/test", ".json");
-
-        // query
-        JSONObject query = LoadJson("./data/query.json");
-
-//        Comparator<Post> comp = new Comparator<Post>() {
-//            @Override
-//            public int compare(Post l, Post r) {
-//                if(l.getCandidateSim() == r.getCandidateSim()) return 0;
-//                if(l.getCandidateSim() < r.getCandidateSim()) return -1;
-//                else if(l.getCandidateSim()>r.getCandidateSim()) return 1;
-//                return 0;
-//            }
-//        };
-
-        JSONArray jarray = query.getJSONArray("Reviews");
-        for (int i = 0; i < jarray.length(); i++) {
-            Post q = analyzer.getPostFromJson(jarray.getJSONObject(i));
-            Post [] max = new Post[3];
-            for(Post can: analyzer.m_test) {
-                double simi = q.similiarity(can);
-                can.setCandidateValue(simi);
-                insertHelper(max, can);
-            }
-            System.out.println("=========================================================");
-            System.out.println("Printing Corresponding Post for query" + i);
-            for(int j=0; j<max.length; j++) {
-                max[j].printPost();
-                System.out.println("Cosine Similarity: " + max[j].getCandidateSim());
-            }
-        }
-    }
-
     public static void insertHelper(Post [] max, Post insert) {
         for(int i=0; i<max.length; i++) {
             if(max[i] == null){
@@ -550,45 +438,90 @@ public class DocAnalyzer {
         }
     }
 
+    public String sampleSentences(LanguageModel ref, int limit) throws Exception {
+        if(limit<0) throw new Exception("limit can not be negative");
 
-    public void exportStop(String filePath) throws IOException {
-        File file = new File(filePath);
-        synchronized (file) {
-            FileWriter fw = new FileWriter(filePath);
-            for(String word: m_stopwords) {
-                if(word.contains("-")) continue;
-                fw.write(word+"\n");
-            }
-            fw.close();
+        StringBuilder sb = new StringBuilder();
+        for(int i=0; i<limit-1; i++) {
+            String pre = ((BigramLM)m_langModel).sampling("UNKNOWN");
+            sb.append(pre);
+            sb.append(" ");
         }
+        return sb.toString().trim();
     }
 
-    public static void main(String[] args) throws Exception {
-        DocAnalyzer analyzer = new DocAnalyzer(
+    public static void generateTop10(BigramLM lm, String word) {
+        System.out.println(Arrays.toString(lm.getTop10(word)));
+    }
+
+    public double [] evaluateLM(LanguageModel lm) throws Exception {
+        double [] res = new double[m_test.size()];
+        for(int i=0; i<m_test.size(); i++) {
+            res[i] = lm.getPerplexity(m_test.get(i));
+        }
+        return res;
+    }
+
+    public static void main(String [] args) throws Exception {
+        LMAnalyzer uniAnalyzer = new LMAnalyzer(
                 "./data/Model/en-token.bin",
                 "./data/punctuation",
+                "./data/stopwords",
+                1);
+        uniAnalyzer.createLanguageModel("./Data/yelp/train");
+
+        LMAnalyzer linearAnalyzer = new LMAnalyzer(
+                "./data/Model/en-token.bin",
+                "./data/punctuation",
+                "./data/stopwords",
                 2);
-        //code for demonstrating tokenization and stemming
-        //analyzer.TokenizerDemon("whatever I've practiced for 30 years in pediatrics, and I've never seen anything quite like this.");
+        linearAnalyzer.createLanguageModel("./Data/yelp/train", uniAnalyzer.m_langModel, 0, 0.9);
 
-        //entry point to deal with a collection of documents
+        LMAnalyzer absoluteAnalyzer = new LMAnalyzer(
+                "./data/Model/en-token.bin",
+                "./data/punctuation",
+                "./data/stopwords",
+                2);
 
-        analyzer.LoadDirectory("./Data/yelp/train", ".json");
-        // analyzer.LoadDirectory("./Data/yelp/test", ".json");
+        absoluteAnalyzer.createLanguageModel("./Data/yelp/train", uniAnalyzer.m_langModel, 1, 0.1);
 
-        // P1 1.1
-        Map<String, Token> sortedMap;
+        // generate top 10 good.
+        System.out.println("========= For linear smooth Bigram model ===========");
+        generateTop10((BigramLM) linearAnalyzer.m_langModel, "good");
+        for(int i=0; i<10; i++) {
+            System.out.println(linearAnalyzer.sampleSentences(uniAnalyzer.m_langModel, 15));
+        }
 
-        // sortedMap = MapUtils.sortByTokenValue(analyzer.m_stats);
-        // MapUtils.exportMap(sortedMap, "./test");
-        // MapUtils.printRegression(sortedMap);
-        // PlotUtils.plotHashMap(sortedMap);
+        System.out.println("========= For Absolute smooth Bigram model ===========");
+        generateTop10((BigramLM) absoluteAnalyzer.m_langModel, "good");
+        for(int i=0; i<10; i++) {
+            System.out.println(absoluteAnalyzer.sampleSentences(uniAnalyzer.m_langModel, 15));
+        }
 
-        // p1 1.2
-        analyzer.loadStopwords("./data/stopwords");
+        // part 3.
+        LMAnalyzer test = new LMAnalyzer(
+                "./data/Model/en-token.bin",
+                "./data/punctuation",
+                "./data/stopwords",
+                1);
 
-        sortedMap = MapUtils.sortByDf(analyzer.m_stats);
-        analyzer.addStopwords(sortedMap, 100);
-        analyzer.exportStop("./newstop");
+        test.loadTest("./data/yelp/test", ".json");
+
+        double [] uniPer = test.evaluateLM(uniAnalyzer.m_langModel);
+        analysePer(uniPer);
+        double [] linearPer = test.evaluateLM(linearAnalyzer.m_langModel);
+        analysePer(linearPer);
+        double [] absoPer = test.evaluateLM(absoluteAnalyzer.m_langModel);
+        analysePer(absoPer);
     }
+
+    public static void analysePer(double [] pers) {
+        Mean mean = new Mean();
+        StandardDeviation sd = new StandardDeviation();
+        double m = mean.evaluate(pers);
+        double sdv = sd.evaluate(pers);
+        System.out.println("Mean: "+m+", Standard Deviation: "+sdv);
+    }
+
+
 }

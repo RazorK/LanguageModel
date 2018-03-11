@@ -57,6 +57,7 @@ public class Token {
         m_ttf_value = 0;
         m_df_value = 0;
         m_idf_value = 0;
+        pro = 0;
     }
 
     //default constructor
@@ -81,4 +82,15 @@ public class Token {
     public void setIDFValue(double idf) {
         m_idf_value = idf;
     }
+
+    public double getPro() {
+        return pro;
+    }
+
+    public void setPro(double pro) {
+        this.pro = pro;
+    }
+
+    double pro;
+
 }

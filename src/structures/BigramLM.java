@@ -87,7 +87,6 @@ public class BigramLM extends LanguageModel{
             for(Map.Entry<String, Token> inneren: map.entrySet()) {
                 total += inneren.getValue().getTTFValue();
             }
-
             double lambda = m_delta * S/total;
             absoluteLambda.put(en.getKey(), lambda);
 
@@ -109,7 +108,7 @@ public class BigramLM extends LanguageModel{
         } else {
             if(m_type == 0) {
                 // linear
-                return m_lambda * m_reference.getPro(las);
+                return (1-m_lambda) * m_reference.getPro(las);
             } else if(m_type == 1) {
                 // absolute
                 return absoluteLambda.get(pre) * m_reference.getPro(las);

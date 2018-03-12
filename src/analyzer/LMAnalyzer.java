@@ -63,10 +63,10 @@ public class LMAnalyzer {
         m_vol = new HashSet<>();
 
         //tricky
-        m_stopwords.add("NUM");
+        //m_stopwords.add("NUM");
 
         loadPunctuation(puncFileAddress);
-        loadStopwords(stopwordAdd);
+        //loadStopwords(stopwordAdd);
     }
 
     public void loadPunctuation(String filename) {
@@ -259,7 +259,7 @@ public class LMAnalyzer {
             else if (f.isDirectory())
                 LoadDirectory(f.getAbsolutePath(), suffix);
             // TODO break
-            // break;
+            //break;
         }
         size = m_reviews.size() - size;
         System.out.println("Loading " + size + " review documents from " + folder);
@@ -273,7 +273,7 @@ public class LMAnalyzer {
             else if (f.isDirectory())
                 LoadDirectory(f.getAbsolutePath(), suffix);
             // TODO break
-            // break;
+            //break;
         }
     }
 

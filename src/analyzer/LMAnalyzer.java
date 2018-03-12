@@ -60,6 +60,7 @@ public class LMAnalyzer {
         m_tokenizer = new TokenizerME(new TokenizerModel(new FileInputStream(tokenModel)));
 
         m_stats = new HashMap<>();
+        m_vol = new HashSet<>();
 
         //tricky
         m_stopwords.add("NUM");
@@ -271,7 +272,17 @@ public class LMAnalyzer {
                 analyzeTest(LoadJson(f.getAbsolutePath()));
             else if (f.isDirectory())
                 LoadDirectory(f.getAbsolutePath(), suffix);
-            System.out.println(m_test.size());
+            // TODO break
+            // break;
+        }
+    }
+
+    public void addTestVol(String [] nom) {
+        if(nom == null || nom.length == 0) return;
+        for(String word : nom) {
+            if(!m_vol.contains(word)) {
+                m_vol.add(word);
+            }
         }
     }
 
@@ -296,6 +307,8 @@ public class LMAnalyzer {
 
                 // remove stopWords
                 String [] removed = MapUtils.removeStopwords(nom, m_stopwords);
+                addTestVol(nom);
+
                 review.setTokens(removed);
                 m_test.add(review);
             }
@@ -457,7 +470,12 @@ public class LMAnalyzer {
     public double [] evaluateLM(LanguageModel lm) throws Exception {
         double [] res = new double[m_test.size()];
         for(int i=0; i<m_test.size(); i++) {
-            res[i] = lm.getPerplexity(m_test.get(i));
+            String [] tokens = m_test.get(i).getTokens();
+            if(tokens == null || tokens.length == 0) continue;
+            if(lm.m_N == 1)
+                res[i] = lm.getPerplexity(m_test.get(i));
+            else
+                res[i] = ((BigramLM)lm).getPerplexity(m_test.get(i));
         }
         return res;
     }
@@ -485,7 +503,9 @@ public class LMAnalyzer {
 
         absoluteAnalyzer.createLanguageModel("./Data/yelp/train", uniAnalyzer.m_langModel, 1, 0.1);
 
-        // generate top 10 good.
+        System.out.println("Finish create model");
+
+        // generate top 10 from good.
         System.out.println("========= For linear smooth Bigram model ===========");
         generateTop10((BigramLM) linearAnalyzer.m_langModel, "good");
         for(int i=0; i<10; i++) {
@@ -498,6 +518,8 @@ public class LMAnalyzer {
             System.out.println(absoluteAnalyzer.sampleSentences(uniAnalyzer.m_langModel, 15));
         }
 
+
+        System.out.println("Start analyse test");
         // part 3.
         LMAnalyzer test = new LMAnalyzer(
                 "./data/Model/en-token.bin",
@@ -507,10 +529,20 @@ public class LMAnalyzer {
 
         test.loadTest("./data/yelp/test", ".json");
 
+        System.out.println("Start reProcess");
+        uniAnalyzer.m_langModel.addictSmooth(test.m_vol, 0.1);
+        ((BigramLM) linearAnalyzer.m_langModel).reProcess();
+        ((BigramLM) absoluteAnalyzer.m_langModel).reProcess();
+
+        System.out.println("Start uniPer");
         double [] uniPer = test.evaluateLM(uniAnalyzer.m_langModel);
         analysePer(uniPer);
+
+        System.out.println("Start linear");
         double [] linearPer = test.evaluateLM(linearAnalyzer.m_langModel);
         analysePer(linearPer);
+
+        System.out.println("Start abso");
         double [] absoPer = test.evaluateLM(absoluteAnalyzer.m_langModel);
         analysePer(absoPer);
     }

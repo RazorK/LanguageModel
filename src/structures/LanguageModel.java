@@ -13,7 +13,7 @@ import java.util.Map;
  */
 public class LanguageModel {
 
-	int m_N; // N-gram
+	public int m_N; // N-gram
 	int m_V; // the vocabular size
 	HashMap<String, Token> m_model; // sparse structure for storing the maximum likelihood estimation of LM with the seen N-grams
 	LanguageModel m_reference; // pointer to the reference language model for smoothing purpose
@@ -99,7 +99,8 @@ public class LanguageModel {
 	public double getPerplexity(Post review) throws Exception {
 	    double log = logLikelihood(review);
 	    double length = review.getTokens().length;
-	    return -log/length;
+	    double pow = -log/length;
+	    return Math.exp(pow);
     }
 
 	public void addictSmooth(HashSet<String> newVol, double delta) {

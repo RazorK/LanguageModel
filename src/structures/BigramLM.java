@@ -11,6 +11,8 @@ public class BigramLM extends LanguageModel{
     LanguageModel m_reference; // pointer to the reference language model for smoothing purpose
     int m_type;
 
+    HashMap<String, Double> absoluteLambda;
+
     /**
      *
      * @param N
@@ -61,10 +63,11 @@ public class BigramLM extends LanguageModel{
         m_V = m_model.size();
         for(Map.Entry<String, HashMap<String, Token>> en : m_model.entrySet()) {
             long total = 0;
-            for(Map.Entry<String, Token> inneren: en.getValue().entrySet()) {
+            HashMap<String, Token> map = en.getValue();
+            for(Map.Entry<String, Token> inneren: map.entrySet()) {
                 total += inneren.getValue().getTTFValue();
             }
-            for(Map.Entry<String, Token> inneren: en.getValue().entrySet()) {
+            for(Map.Entry<String, Token> inneren: map.entrySet()) {
                 Token t = inneren.getValue();
                 t.setPro(m_lambda* t.getTTFValue()/total + (1-m_lambda)*m_reference.getPro(inneren.getKey()));
             }
@@ -74,18 +77,21 @@ public class BigramLM extends LanguageModel{
     public void processAbsolute(double delta) {
         m_delta = delta;
         m_V = m_model.size();
+        absoluteLambda = new HashMap<>();
 
         for(Map.Entry<String, HashMap<String, Token>> en : m_model.entrySet()) {
             long total = 0;
             int S = en.getValue().size();
+            HashMap<String, Token> map = en.getValue();
 
-            for(Map.Entry<String, Token> inneren: en.getValue().entrySet()) {
+            for(Map.Entry<String, Token> inneren: map.entrySet()) {
                 total += inneren.getValue().getTTFValue();
             }
 
             double lambda = m_delta * S/total;
+            absoluteLambda.put(en.getKey(), lambda);
 
-            for(Map.Entry<String, Token> inneren: en.getValue().entrySet()) {
+            for(Map.Entry<String, Token> inneren: map.entrySet()) {
                 Token t = inneren.getValue();
                 t.setPro((t.getTTFValue()-m_delta)/total + lambda * m_reference.getPro(inneren.getKey()));
             }
@@ -94,9 +100,20 @@ public class BigramLM extends LanguageModel{
 
     public double getPro(String pre, String las) {
         HashMap<String, Token> t = m_model.get(pre);
+        // special case here, if t is null, which means the first word is not seen, we should back off to a unigram
+        if(t == null || t.size() == 0) {
+            return m_reference.getPro(las);
+        }
         if(t.containsKey(las)) {
             return t.get(las).getPro();
         } else {
+            if(m_type == 0) {
+                // linear
+                return m_lambda * m_reference.getPro(las);
+            } else if(m_type == 1) {
+                // absolute
+                return absoluteLambda.get(pre) * m_reference.getPro(las);
+            }
             return 0;
         }
     }
@@ -121,7 +138,7 @@ public class BigramLM extends LanguageModel{
         String [] res = new String[10];
         int i=0;
         for(String word: sort.keySet()) {
-            res[i] = word + getPro(pre, word);
+            res[i] = word;
             if(i++>=9) break;
         }
         return res;
@@ -132,15 +149,10 @@ public class BigramLM extends LanguageModel{
         double likelihood = m_reference.getPro(tokens[0]);
         for(int i=0; i<tokens.length-1; i++) {
             double pro = getPro(tokens[i], tokens[i+1]);
+            if(pro >=1 || pro<0) throw new Exception("wrong pro in bigram");
             if(pro == 0) throw new Exception("smoothed Bigram can't have zero probability");
-            likelihood+= pro;
+            likelihood+= Math.log(pro);
         }
         return likelihood;
-    }
-
-    public double getPerplexity(Post review) throws Exception {
-        double log = logLikelihood(review);
-        double length = review.getTokens().length;
-        return -log/length;
     }
 }

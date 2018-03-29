@@ -20,6 +20,7 @@ import structures.Token;
 import utils.MapUtils;
 
 import java.io.*;
+import java.lang.reflect.Array;
 import java.util.*;
 
 public class LMAnalyzer {
@@ -451,12 +452,24 @@ public class LMAnalyzer {
         }
     }
 
-    public String sampleSentences(LanguageModel ref, int limit) throws Exception {
+    public String sampleSentences(LanguageModel ref, int limit, ArrayList<Double> cur) throws Exception {
         if(limit<0) throw new Exception("limit can not be negative");
 
         StringBuilder sb = new StringBuilder();
         for(int i=0; i<limit-1; i++) {
-            String pre = ((BigramLM)m_langModel).sampling("UNKNOWN");
+            String pre = ((BigramLM)m_langModel).sampling("UNKNOWN", cur);
+            sb.append(pre);
+            sb.append(" ");
+        }
+        return sb.toString().trim();
+    }
+
+    public String uniSample(int limit, ArrayList<Double> cur) throws Exception {
+        if(limit<0) throw new Exception("limit can not be negative");
+
+        StringBuilder sb = new StringBuilder();
+        for(int i=0; i<limit-1; i++) {
+            String pre = m_langModel.sampling(cur);
             sb.append(pre);
             sb.append(" ");
         }
@@ -506,16 +519,28 @@ public class LMAnalyzer {
         System.out.println("Finish create model");
 
         // generate top 10 from good.
+        System.out.println("========= For Unigram model ===========");
+        for(int i=0; i<10; i++) {
+            ArrayList<Double> pro = new ArrayList<>();
+            System.out.println(uniAnalyzer.uniSample(15, pro));
+            printPro(pro);
+        }
+
+        // generate top 10 from good.
         System.out.println("========= For linear smooth Bigram model ===========");
         generateTop10((BigramLM) linearAnalyzer.m_langModel, "good");
         for(int i=0; i<10; i++) {
-            System.out.println(linearAnalyzer.sampleSentences(uniAnalyzer.m_langModel, 15));
+            ArrayList<Double> pro = new ArrayList<>();
+            System.out.println(linearAnalyzer.sampleSentences(uniAnalyzer.m_langModel, 15, pro));
+            printPro(pro);
         }
 
         System.out.println("========= For Absolute smooth Bigram model ===========");
         generateTop10((BigramLM) absoluteAnalyzer.m_langModel, "good");
         for(int i=0; i<10; i++) {
-            System.out.println(absoluteAnalyzer.sampleSentences(uniAnalyzer.m_langModel, 15));
+            ArrayList<Double> pro = new ArrayList<>();
+            System.out.println(absoluteAnalyzer.sampleSentences(uniAnalyzer.m_langModel, 15, pro));
+            printPro(pro);
         }
 
 
@@ -553,5 +578,15 @@ public class LMAnalyzer {
         double m = mean.evaluate(pers);
         double sdv = sd.evaluate(pers);
         System.out.println("Mean: "+m+", Standard Deviation: "+sdv);
+    }
+
+    public static void printPro(ArrayList<Double> pros) {
+        double res = 1;
+        for(Double pro: pros) {
+            if(pro!=0) {
+                res *= pro;
+            }
+        }
+        System.out.println("The probability of this sentence is:" + res);
     }
 }

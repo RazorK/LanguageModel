@@ -2,6 +2,7 @@ package structures;
 
 import utils.MapUtils;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -117,16 +118,18 @@ public class BigramLM extends LanguageModel{
         }
     }
 
-    public String sampling(String pre) {
+    public String sampling(String pre, ArrayList<Double> cur) {
         if(pre == "UNKNOWN" || !m_model.containsKey(pre)) {
-            while (pre == "UNKNOWN") pre = m_reference.sampling();
+            while (pre == "UNKNOWN") pre = m_reference.sampling(cur);
             return pre;
         }
         double prob = Math.random(); // prepare to perform uniform sampling
         for(String token:m_model.get(pre).keySet()) {
             prob -= getPro(token);
-            if (prob<=0)
+            if (prob<=0) {
+                cur.add(getPro(token));
                 return token;
+            }
         }
         return "UNKNOWN"; //How to deal with this special case?
     }

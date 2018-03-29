@@ -3,6 +3,8 @@
  */
 package structures;
 
+import java.lang.reflect.Array;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -16,19 +18,13 @@ public class LanguageModel {
 	public int m_N; // N-gram
 	int m_V; // the vocabular size
 	HashMap<String, Token> m_model; // sparse structure for storing the maximum likelihood estimation of LM with the seen N-grams
-	LanguageModel m_reference; // pointer to the reference language model for smoothing purpose
-	
+
 	double m_lambda; // parameter for linear interpolation smoothing
 	double m_delta; // parameter for absolute discount smoothing
 
 	public LanguageModel(int N) {
 		m_N = N;
 		m_model = new HashMap<>();
-	}
-	
-	public double calcMLProb(String token) {
-		// return m_model.get(token).getValue(); // should be something like this
-		return 0;
 	}
 
 	public void addOneToModel(String word) {
@@ -60,7 +56,6 @@ public class LanguageModel {
 	}
 
 	public double getPro(String token) {
-		// TODO: addictive
 		if(m_model.containsKey(token)) {
 			return m_model.get(token).getPro();
 		} else {
@@ -68,20 +63,15 @@ public class LanguageModel {
 		}
 	}
 
-//	public double calcLinearSmoothedProb(String token) {
-//		if (m_N>1)
-//			return (1.0-m_lambda) * calcMLProb(token) + m_lambda * m_reference.calcLinearSmoothedProb(token);
-//		else
-//			return 0; // please use additive smoothing to smooth a unigram language model
-//	}
-	
 	//We have provided you a simple implementation based on unigram language model, please extend it to bigram (i.e., controlled by m_N)
-	public String sampling() {
+	public String sampling(ArrayList<Double> cur) {
 		double prob = Math.random(); // prepare to perform uniform sampling
 		for(String token:m_model.keySet()) {
 			prob -= getPro(token);
-			if (prob<=0)
+			if (prob<=0) {
+				cur.add(getPro(token));
 				return token;
+			}
 		}
 		return "UNKNOWN"; //How to deal with this special case?
 	}
@@ -129,10 +119,10 @@ public class LanguageModel {
 		System.out.println("============================");
 	}
 
-	public String generateSentences(int limit) {
+	public String generateSentences(int limit, ArrayList<Double> cur) {
 		StringBuilder sb = new StringBuilder();
 		for(int i=0; i<limit; i++) {
-			sb.append(sampling());
+			sb.append(sampling(cur));
 			sb.append(" ");
 		}
 		return sb.toString().trim();

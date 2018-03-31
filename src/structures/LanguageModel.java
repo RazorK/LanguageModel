@@ -1,7 +1,6 @@
-/**
- * 
- */
 package structures;
+
+import utils.MapUtils;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -109,6 +108,15 @@ public class LanguageModel {
 		processModel();
 	}
 
+	public void addictSmooth(double delta) {
+		for(Map.Entry<String, Token> en : m_model.entrySet()) {
+			Token t = en.getValue();
+			t.setTTFValue(t.getTTFValue()+delta);
+		}
+
+		processModel();
+	}
+
 	public void checkValid() {
 		double sum = 0;
 		for(Token t: m_model.values()) {
@@ -127,4 +135,15 @@ public class LanguageModel {
 		}
 		return sb.toString().trim();
 	}
+
+	public String[] getTopString(int limit) {
+	    String [] res = new String[limit];
+	    Map<String, Token> sort = MapUtils.sortByTTf(m_model);
+        int i=0;
+        for(String word: sort.keySet()) {
+            res[i] = word;
+            if(i++>=limit-1) break;
+        }
+        return res;
+    }
 }

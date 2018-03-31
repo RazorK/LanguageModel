@@ -16,7 +16,6 @@ import java.util.*;
 public class MapUtils {
 
     // State Hashmap MapUtils
-
     public  static  Map<String, Token> sortByTTf(Map<String, Token> map) {
         return sortByTokenValue(map, new Comparator<Map.Entry<String, Token>>() {
             @Override

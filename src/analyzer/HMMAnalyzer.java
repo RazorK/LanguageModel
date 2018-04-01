@@ -2,6 +2,7 @@ package analyzer;
 
 import structures.HMM.StartTag;
 import structures.HMM.Tag;
+import structures.HMM.Trellis;
 import structures.HMM.Word;
 import structures.Pair;
 
@@ -13,7 +14,8 @@ public class HMMAnalyzer {
     HashMap<String, Tag> tagMap;
 
     // start tag
-    Tag start;
+    StartTag start;
+
     public HMMAnalyzer() {
         // initialize variable
         wordMap = new HashMap<>();
@@ -49,7 +51,7 @@ public class HMMAnalyzer {
                     processWT(w, tag, l);
                 }
             } else {
-                processWT(w, t, l);;
+                processWT(w, t, l);
             }
         }
     }
@@ -84,7 +86,6 @@ public class HMMAnalyzer {
         }
         reader.close();
 
-        // TODO: list process
         // process each(t->t, t->w)
         boolean first = true;
         for(int i=0; i<list.size(); i++) {
@@ -108,6 +109,7 @@ public class HMMAnalyzer {
 
     // requirement: , w_delta = 0.1, tag_delta = 0.5
     public void tagSmoothing(double w_delta, double t_delta) {
+        start.additiveSmoothing(t_delta);
         for(Tag t : tagMap.values()) {
             t.additiveSmoothing(w_delta, t_delta);
         }
@@ -120,10 +122,12 @@ public class HMMAnalyzer {
         for (File f : dir.listFiles()) {
             if (f.isFile() && f.getName().endsWith(suffix)) {
                 analyzeDocument(f.getAbsolutePath());
-                System.out.println("Finish loading file number: "+ (++count));
             }
             else if (f.isDirectory())
                 loadDirectory(f.getAbsolutePath(), suffix);
+
+            //TODO
+            break;
         }
     }
 
@@ -151,12 +155,67 @@ public class HMMAnalyzer {
         System.out.println(sb.toString());
     }
 
+    // Viterbi Algorithm Implementation
+    public Trellis POSTagging(String [] words) {
+        HashMap<Tag, Trellis> map = new HashMap<>();
+
+        // init map
+        for(Tag t : tagMap.values()) {
+            Trellis tr = new Trellis(start);
+            map.put(t, tr);
+        }
+
+        // Viterbi
+        for(int i=0; i<words.length; i++) {
+            String word = words[i];
+
+            // use the refMap to capture the original probability
+            Map<Tag, Trellis> refMap = new HashMap<>(map);
+
+            // traverse new column
+            for(Tag t : tagMap.values()) {
+                double maxLogPro = 0;
+                Tag maxTag = null;
+
+                // for each new tag, traverse previous column
+                for(Tag pt : tagMap.values()) {
+                    double temp = refMap.get(pt).getWTLogPro(wordMap.get(word), t);
+
+                    // find max log probability
+                    if(temp>maxLogPro) {
+                        maxTag = t;
+                        maxLogPro = temp;
+                    }
+                }
+
+                // after loop back, find the max transmit probability and corresponding tag
+                map.get(t).addWord(wordMap.get(word), maxTag);
+            }
+        }
+
+        // after finish, find the most likely pos tagging
+        double maxLogPro = 0;
+        Trellis res = null;
+        for(Trellis t : map.values()) {
+            if(t.getLogPro() > maxLogPro) {
+                maxLogPro = t.getLogPro();
+                res = t;
+            }
+        }
+        if(res == null) throw new RuntimeException("Return Trellis shouldn't be null");
+        return res;
+    }
+
     public static void main(String [] args) throws IOException {
+        // part 1
         HMMAnalyzer analyzer = new HMMAnalyzer();
         String address = "./data\\postag\\tagged";
         analyzer.loadDirectory(address, "pos");
         analyzer.tagSmoothing(0.1, 0.5);
         analyzer.printTopWords("NN", 10);
         analyzer.printTopTags("VB", 10);
+
+        // part 2
+
     }
 }

@@ -46,4 +46,12 @@ public class Tag {
     public String [] topTags(int limit) {
         return tagLM.getTopString(limit);
     }
+
+    public double getTagPro(String t) {
+        return tagLM.getPro(t);
+    }
+
+    public double getWordPro(String t) {
+        return wordLM.getPro(t);
+    }
 }

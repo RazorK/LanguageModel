@@ -56,6 +56,30 @@ public class HMMAnalyzer {
         }
     }
 
+    // process Sentence
+    public void processSentence(List<Pair<Word, Tag>> list) {
+        if(list.size() == 0) return;
+
+        // process each(t->t, t->w)
+        boolean first = true;
+        for(int i=0; i<list.size(); i++) {
+            Pair p = list.get(i);
+            Tag tt = (Tag) p.getRight();
+            Word ww = (Word) p.getLeft();
+
+            // add word
+            tt.addWord(ww.getWord());
+
+            // add tag
+            if(first) {
+                start.addTag(tt.getStr());
+                first = false;
+            } else {
+                list.get(i-1).getRight().addTag(tt.getStr());
+            }
+        }
+    }
+
     private void processWT(String word, String tag, List<Pair<Word, Tag>> l) {
         Word w;
         Tag t;
@@ -80,30 +104,16 @@ public class HMMAnalyzer {
         BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(add), "UTF-8"));
         String line;
 
-        List<Pair<Word, Tag>> list = new ArrayList<>();
+        List<Pair<Word, Tag>> sentence = new ArrayList<>();
         while ((line = reader.readLine()) != null) {
-            processLine(line, list);
-        }
-        reader.close();
-
-        // process each(t->t, t->w)
-        boolean first = true;
-        for(int i=0; i<list.size(); i++) {
-            Pair p = list.get(i);
-            Tag tt = (Tag) p.getRight();
-            Word ww = (Word) p.getLeft();
-
-            // add word
-            tt.addWord(ww.getWord());
-
-            // add tag
-            if(first) {
-                start.addTag(tt.getStr());
-                first = false;
+            if(line.equals("")) {
+                processSentence(sentence);
+                sentence = new ArrayList<>();
             } else {
-                list.get(i-1).getRight().addTag(tt.getStr());
+                processLine(line, sentence);
             }
         }
+        reader.close();
     }
 
 
@@ -125,9 +135,6 @@ public class HMMAnalyzer {
             }
             else if (f.isDirectory())
                 loadDirectory(f.getAbsolutePath(), suffix);
-
-            //TODO
-            break;
         }
     }
 

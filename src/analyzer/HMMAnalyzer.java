@@ -13,6 +13,9 @@ public class HMMAnalyzer {
     HashMap<String, Word> wordMap;
     HashMap<String, Tag> tagMap;
 
+    // sentence storage
+    List<List<Pair<Word, Tag>>> sentences;
+
     // start tag
     StartTag start;
 
@@ -20,6 +23,7 @@ public class HMMAnalyzer {
         // initialize variable
         wordMap = new HashMap<>();
         tagMap = new HashMap<>();
+        sentences = new ArrayList<>();
 
         start = new StartTag();
     }
@@ -59,6 +63,9 @@ public class HMMAnalyzer {
     // process Sentence
     public void processSentence(List<Pair<Word, Tag>> list) {
         if(list.size() == 0) return;
+
+        // add to storage
+        sentences.add(list);
 
         // process each(t->t, t->w)
         boolean first = true;
@@ -136,6 +143,8 @@ public class HMMAnalyzer {
             else if (f.isDirectory())
                 loadDirectory(f.getAbsolutePath(), suffix);
         }
+
+        System.out.println("Total sentences number: "+sentences.size());
     }
 
     public void printTopWords(String t, int limit) {

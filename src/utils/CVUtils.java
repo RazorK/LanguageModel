@@ -1,5 +1,6 @@
 package utils;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -81,6 +82,14 @@ public class CVUtils {
     public static void main(String [] args) {
         CVUtils cv = new CVUtils(51,5);
         System.out.println(cv.getTestIndex(0));
+    }
+
+    public static <T> ArrayList<T> getItems(List<T> total, List<Integer> index) {
+        ArrayList<T> res = new ArrayList<>();
+        for (Integer anIndex : index) {
+            res.add(total.get(anIndex));
+        }
+        return res;
     }
 
 }

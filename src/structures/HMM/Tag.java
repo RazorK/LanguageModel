@@ -4,6 +4,7 @@ import structures.LanguageModel;
 import structures.Token;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 
 public class Tag {
@@ -11,10 +12,10 @@ public class Tag {
     String tagRepre;
 
     // Language Model for Tag
-    LanguageModel tagLM;
+    public LanguageModel tagLM;
 
     // language model for word
-    LanguageModel wordLM;
+    public LanguageModel wordLM;
 
     public Tag(String t) {
         tagRepre = t;
@@ -37,6 +38,19 @@ public class Tag {
     public void additiveSmoothing(double w_delta, double t_delta) {
         tagLM.addictSmooth(t_delta);
         wordLM.addictSmooth(w_delta);
+    }
+
+    public void additiveSmoothing(double w_delta, double t_delta , HashSet<String> wordVol, HashSet<String> tagVol) {
+        tagLM.addictSmooth(tagVol, t_delta);
+        wordLM.addictSmooth(wordVol, w_delta);
+    }
+
+    public double getUnknownTagPro() {
+        return tagLM.getUnknown();
+    }
+
+    public double getUnknownWordPro() {
+        return wordLM.getUnknown();
     }
 
     public String [] topWords(int limit) {

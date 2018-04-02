@@ -20,6 +20,9 @@ public class LanguageModel {
 
 	double m_lambda; // parameter for linear interpolation smoothing
 	double m_delta; // parameter for absolute discount smoothing
+	double add_delta;
+	private double unknown;
+	private int total;
 
 	public LanguageModel(int N) {
 		m_N = N;
@@ -43,23 +46,28 @@ public class LanguageModel {
 //		m_model.put("UNKNOWN", unseen);
 
 		m_V = m_model.size();
-		long total = 0;
+		double total = 0;
 		for(Map.Entry<String, Token> en : m_model.entrySet()) {
 			total += en.getValue().getTTFValue();
 		}
 		for(Map.Entry<String, Token> en : m_model.entrySet()) {
 			Token t = en.getValue();
-			double pro = t.getTTFValue()/total;
+			double pro = (t.getTTFValue()+0.0)/total;
 			t.setPro(pro);
 		}
+		unknown = add_delta/total;
 	}
 
 	public double getPro(String token) {
 		if(m_model.containsKey(token)) {
 			return m_model.get(token).getPro();
 		} else {
-			return 0;
+			return unknown;
 		}
+	}
+
+	public double getUnknown() {
+		return unknown;
 	}
 
 	//We have provided you a simple implementation based on unigram language model, please extend it to bigram (i.e., controlled by m_N)
@@ -92,23 +100,37 @@ public class LanguageModel {
 	    return Math.exp(pow);
     }
 
+
 	public void addictSmooth(HashSet<String> newVol, double delta) {
+		add_delta = delta;
 		if(newVol == null || newVol.size() == 0) return;
-		for(String word:newVol) {
-			if(!m_model.containsKey(word)) {
-				m_model.put(word, new Token(word));
-			}
-		}
+		total = newVol.size();
+//		for(String word:newVol) {
+//			if(!m_model.containsKey(word)) {
+//				m_model.put(word, new Token(word));
+//			}
+//		}
 
-		for(Map.Entry<String, Token> en : m_model.entrySet()) {
-			Token t = en.getValue();
-			t.setTTFValue(t.getTTFValue()+delta);
-		}
+//		for(Map.Entry<String, Token> en : m_model.entrySet()) {
+//			Token t = en.getValue();
+//			t.setTTFValue(t.getTTFValue()+delta);
+//		}
 
-		processModel();
+        double under = 0;
+        for(Map.Entry<String, Token> en : m_model.entrySet()) {
+            under += en.getValue().getTTFValue();
+        }
+        under += total*delta;
+        for(Map.Entry<String, Token> en : m_model.entrySet()) {
+            Token t = en.getValue();
+            double pro = (t.getTTFValue()+0.0)/under;
+            t.setPro(pro);
+        }
+        unknown = add_delta/under;
 	}
 
 	public void addictSmooth(double delta) {
+		add_delta = delta;
 		for(Map.Entry<String, Token> en : m_model.entrySet()) {
 			Token t = en.getValue();
 			t.setTTFValue(t.getTTFValue()+delta);
@@ -145,5 +167,12 @@ public class LanguageModel {
             if(i++>=limit-1) break;
         }
         return res;
+    }
+
+    public void printModel() {
+	    for(Map.Entry<String, Token> e : m_model.entrySet()) {
+	        System.out.println("Str: "+e.getKey() + ", Pro: "+e.getValue().getPro() + ", TTF:"+e.getValue().getTTFValue());
+        }
+        System.out.println("Unknown Pro: "+ getUnknown());
     }
 }

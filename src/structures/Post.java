@@ -79,6 +79,11 @@ public class Post {
     //overall rating to the business in this review
     double m_rating;
 
+    public boolean positive() {
+        if(m_rating>=4) return true;
+        else return false;
+    }
+
     public double getRating() {
         return m_rating;
     }

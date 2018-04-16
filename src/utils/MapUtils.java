@@ -15,7 +15,16 @@ import java.util.*;
 
 public class MapUtils {
 
-    // State Hashmap MapUtils
+    public static Map<String, Token> sortByIG(Map<String, Token> map) {
+        return sortByTokenValue(map, (en1, en2) -> -((Comparable<Double>)en1.getValue().getIG())
+                .compareTo(en2.getValue().getIG()));
+    }
+
+    public static Map<String, Token> sortByChis(Map<String, Token> map) {
+        return sortByTokenValue(map, (en1, en2) -> -((Comparable<Double>)en1.getValue().getChis())
+                .compareTo(en2.getValue().getChis()));
+    }
+
     public  static  Map<String, Token> sortByTTf(Map<String, Token> map) {
         return sortByTokenValue(map, new Comparator<Map.Entry<String, Token>>() {
             @Override

@@ -8,6 +8,31 @@ package structures;
  *         Suggested structure for constructing N-gram language model and vector space representation
  */
 public class Token {
+    //default constructor
+    public Token(String token) {
+        m_token = token;
+        m_id = -1;
+        m_ttf_value = 0;
+        m_df_value = 0;
+        m_idf_value = 0;
+        pro = 0;
+
+        pos = 0;
+        neg = 0;
+    }
+
+    //default constructor
+    public Token(int id, String token) {
+        m_token = token;
+        m_id = id;
+        m_ttf_value = 0;
+        m_df_value = 0;
+        m_idf_value = 0;
+        pro = 0;
+
+        pos = 0;
+        neg = 0;
+    }
 
     int m_id; // the numerical ID you assigned to this token/N-gram
 
@@ -50,24 +75,6 @@ public class Token {
     }
 
     double m_idf_value;
-    //default constructor
-    public Token(String token) {
-        m_token = token;
-        m_id = -1;
-        m_ttf_value = 0;
-        m_df_value = 0;
-        m_idf_value = 0;
-        pro = 0;
-    }
-
-    //default constructor
-    public Token(int id, String token) {
-        m_token = token;
-        m_id = id;
-        m_ttf_value = 0;
-        m_df_value = 0;
-        m_idf_value = 0;
-    }
 
     public double getIDFValue() {
         return m_idf_value;
@@ -92,5 +99,49 @@ public class Token {
     }
 
     double pro;
+
+    int pos;
+    int neg;
+
+    public void addPos() {pos++;}
+    public void addNeg() {neg++;}
+
+    int t_pos;
+    int t_neg;
+
+    double IG;
+    double chis;
+
+    // calculate IG and Chi Square.
+    public void process(int total_pos, int total_neg) {
+        t_pos = total_pos;
+        t_neg = total_neg;
+
+        double A = pos, C = neg, B = t_pos-pos, D = t_neg-neg, total = total_neg + total_pos;
+        if(m_token.equals("nt") || m_token.equals("NUM")) {
+            System.out.println("Debug " + m_token);
+            System.out.println(A + ", " + B + "," + C + "," + D);
+        }
+        IG = ((A+C)/total) * (getEntro(A,C)) + ((B+D)/total) * getEntro(B, D) - getEntro(A+B, C+D);
+
+        chis = total * (A*D - B*C) * (A*D - B*C) / ((A+C) * (B+D) * (A+B) * (C+D));
+    }
+
+    private static double getEntro(double pos, double neg) {
+        double p_pos = pos/(pos+neg);
+        double p_neg = neg/(pos+neg);
+
+        double res = 0;
+        if(p_pos != 0) res += p_pos * Math.log(p_pos);
+
+        if(p_neg != 0) res += p_neg * Math.log(p_neg);
+
+        return res;
+    }
+
+    public double getIG() {return IG;}
+    public double getChis() {return chis;}
+
+
 
 }

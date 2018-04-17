@@ -15,6 +15,11 @@ import java.util.*;
 
 public class MapUtils {
 
+    public static Map<String, Double> sortByLogRatio(Map<String, Double> map) {
+        return sortByTokenValue(map, (en1, en2) -> -(en1.getValue())
+                .compareTo(en2.getValue()));
+    }
+
     public static Map<String, Token> sortByIG(Map<String, Token> map) {
         return sortByTokenValue(map, (en1, en2) -> -((Comparable<Double>)en1.getValue().getIG())
                 .compareTo(en2.getValue().getIG()));
@@ -45,19 +50,31 @@ public class MapUtils {
         });
     }
 
-    public static Map<String, Token> sortByTokenValue(Map<String, Token> map, Comparator<? super Map.Entry<String, Token>> com) {
-        List<Map.Entry<String, Token>> list = new LinkedList<>(map.entrySet());
+//    public static Map<String, Token> sortByTokenValue(Map<String, Token> map, Comparator<? super Map.Entry<String, Token>> com) {
+//        List<Map.Entry<String, Token>> list = new LinkedList<>(map.entrySet());
+//        Collections.sort(list, com);
+//
+//        Map<String, Token> result = new LinkedHashMap<>();
+//        for (Iterator<Map.Entry<String, Token>> it = list.iterator(); it.hasNext();) {
+//            Map.Entry<String, Token> entry = it.next();
+//            result.put(entry.getKey(), entry.getValue());
+//        }
+//        return result;
+//    }
+
+    public static <K,V> Map<K, V> sortByTokenValue(Map<K, V> map, Comparator<? super Map.Entry<K, V>> com) {
+        List<Map.Entry<K, V>> list = new LinkedList<>(map.entrySet());
         Collections.sort(list, com);
 
-        Map<String, Token> result = new LinkedHashMap<>();
-        for (Iterator<Map.Entry<String, Token>> it = list.iterator(); it.hasNext();) {
-            Map.Entry<String, Token> entry = it.next();
+        Map<K, V> result = new LinkedHashMap<>();
+        for (Iterator<Map.Entry<K, V>> it = list.iterator(); it.hasNext();) {
+            Map.Entry<K, V> entry = it.next();
             result.put(entry.getKey(), entry.getValue());
         }
         return result;
     }
 
-    private static <K, V> Map<K, V> sortByValue(Map<K, V> map) {
+    public static <K, V> Map<K, V> sortByValue(Map<K, V> map) {
         List<Map.Entry<K, V>> list = new LinkedList<>(map.entrySet());
         Collections.sort(list, new Comparator<Object>() {
             @SuppressWarnings("unchecked")

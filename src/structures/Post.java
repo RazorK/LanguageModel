@@ -3,7 +3,10 @@
  */
 package structures;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 
 import json.JSONException;
 import json.JSONObject;
@@ -183,6 +186,7 @@ public class Post {
         } catch (JSONException e) {
             e.printStackTrace();
         }
+        features = new ArrayList<>();
     }
 
     public JSONObject getJSON() throws JSONException {
@@ -207,4 +211,19 @@ public class Post {
     }
 
     String [] tokens;
+
+    List<String> features;
+
+    public int getFeatureLength() {
+        return features.size();
+    }
+
+    public void addFeature(String t) {
+        features.add(t);
+    }
+
+    public Iterator<String> getFeatureIt() {
+        return features.iterator();
+    }
+
 }

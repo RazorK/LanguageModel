@@ -30,15 +30,23 @@ public class LanguageModel {
 	}
 
 	public void addOneToModel(String word) {
-		if(m_model.containsKey(word)) {
-			Token temp = m_model.get(word);
-			temp.setTTFValue(temp.getTTFValue()+1);
-		} else {
-			Token temp = new Token(word);
-			temp.setTTFValue(1);
-			m_model.put(word, temp);
-		}
-	}
+        if(m_model.containsKey(word)) {
+            Token temp = m_model.get(word);
+            temp.setTTFValue(temp.getTTFValue()+1);
+        } else {
+            Token temp = new Token(word);
+            temp.setTTFValue(1);
+            m_model.put(word, temp);
+        }
+    }
+
+    public void addOneToAppearModel(String word) {
+        if (!m_model.containsKey(word)) {
+            Token temp = new Token(word);
+            temp.setTTFValue(1);
+            m_model.put(word, temp);
+        }
+    }
 
 	public void processModel() {
 		// addictive smooth
@@ -105,6 +113,7 @@ public class LanguageModel {
 		add_delta = delta;
 		if(newVol == null || newVol.size() == 0) return;
 		total = newVol.size();
+
 //		for(String word:newVol) {
 //			if(!m_model.containsKey(word)) {
 //				m_model.put(word, new Token(word));

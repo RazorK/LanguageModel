@@ -118,10 +118,6 @@ public class Token {
         t_neg = total_neg;
 
         double A = pos, C = neg, B = t_pos-pos, D = t_neg-neg, total = total_neg + total_pos;
-        if(m_token.equals("nt") || m_token.equals("NUM")) {
-            System.out.println("Debug " + m_token);
-            System.out.println(A + ", " + B + "," + C + "," + D);
-        }
         IG = ((A+C)/total) * (getEntro(A,C)) + ((B+D)/total) * getEntro(B, D) - getEntro(A+B, C+D);
 
         chis = total * (A*D - B*C) * (A*D - B*C) / ((A+C) * (B+D) * (A+B) * (C+D));

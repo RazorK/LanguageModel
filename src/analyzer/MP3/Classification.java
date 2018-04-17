@@ -8,6 +8,8 @@ import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
+import structures.LanguageModel;
+import structures.NaiveBayes.NBModel;
 import structures.Post;
 import structures.Token;
 import utils.MapUtils;
@@ -162,21 +164,17 @@ public class Classification {
                 }
 
                 nom = MapUtils.removeEmpty(nom);
+                review.setTokens(nom);
                 if(nom.length == 0) return;
 
                 for(String word : nom) {
                     if(m_stats.containsKey(word)) {
                         Token temp = m_stats.get(word);
                         temp.setTTFValue(temp.getTTFValue()+1);
-
-                        if(pos) temp.addPos(); else temp.addNeg();
-
                     } else {
                         Token temp = new Token(word);
                         temp.setTTFValue(1);
                         m_stats.put(word, temp);
-
-                        if(pos) temp.addPos(); else temp.addNeg();
                     }
 
                     if(!doc_df.contains(word)) {
@@ -188,6 +186,7 @@ public class Classification {
                     if(m_stats.containsKey(word)) {
                         Token t = m_stats.get(word);
                         t.setDFValue(t.getDFValue()+1);
+                        if(pos) t.addPos(); else t.addNeg();
                     }
                 }
 
@@ -251,6 +250,7 @@ public class Classification {
             newig.add(token);
             if(++count == 5000) break;
         }
+        System.out.println("Size of Ig map : " + newig.size());
 
         Set<String> newChiq = new HashSet<>();
         count = 0;
@@ -258,9 +258,11 @@ public class Classification {
             if(count++ > 5000 || en.getValue().getChis()<3.841) break;
             newChiq.add(en.getKey());
         }
+        System.out.println("size of chiq map" + newChiq.size());
 
         // remove useless feature
         Set<String> temp = new HashSet<String> (m_stats.keySet());
+        System.out.println("Before remove" + m_stats.size());
         for(String t:temp) {
             if(!newig.contains(t) && !newChiq.contains(t)) {
                 m_stats.remove(t);
@@ -271,7 +273,67 @@ public class Classification {
     }
 
     public void reviewSelection() {
+        List<Integer> rm = new ArrayList<>();
+        for(int i=0; i<m_reviews.size(); i++) {
+            Post p = m_reviews.get(i);
+            String [] ts = p.getTokens();
+            for(String t: ts) {
+                if(m_stats.containsKey(t)) {
+                    p.addFeature(t);
+                }
+            }
 
+            if(p.getFeatureLength() <= 5) {
+                rm.add(i);
+            }
+        }
+
+        System.out.println("Before remove: " + m_reviews.size());
+        System.out.println("remove num: " + rm.size());
+        for(int i = rm.size()-1; i>=0; i--) {
+            m_reviews.remove((int)rm.get(i));
+        }
+
+        System.out.println("After remove, size of review: " + m_reviews.size() );
+
+        System.out.println("After feature selection, review remains: " + m_reviews.size());
+    }
+
+    public static void printMap(Map<String, Token> map, boolean ig) {
+        String name = ig? "Information Gain" : "Chi Square";
+        System.out.println("Top 20 words selected by " + name + ": ");
+        int i = 0;
+        for(Map.Entry<String, Token> en : map.entrySet()) {
+            if(++i == 20) break;
+            System.out.println(en.getKey() + ", " + name + ": " + (ig?en.getValue().getIG() : en.getValue().getChis()));
+        }
+    }
+
+    // Task2
+    public NBModel nb;
+    /**
+     * construct two language model for NB.
+     * add features to the model.
+     */
+    public void initNBModel() {
+        nb = new NBModel(0.1);
+
+        trainNB(nb, m_reviews);
+
+        nb.additiveSmooth(m_stats.keySet());
+    }
+
+    public static void trainNB(NBModel nb, List<Post> re) {
+        int pos = 0, neg = 0;
+        for(Post p : re) {
+            if(p.positive()) pos++; else neg++;
+            Iterator<String> it = p.getFeatureIt();
+            while (it.hasNext()) {
+                String f = it.next();
+                nb.addToModel(f, p.positive());
+            }
+        }
+        nb.setZeroPara(pos, neg);
     }
 
     public static void main(String [] args) throws IOException {
@@ -279,6 +341,7 @@ public class Classification {
                 "./data/Model/en-token.bin",
                 "./data/punctuation");
 
+        // Task1
         analyzer.loadStopwords("./data/stopwords");
         analyzer.LoadDirectory("./Data/yelp/train", ".json");
         analyzer.LoadDirectory("./Data/yelp/test", ".json");
@@ -291,15 +354,14 @@ public class Classification {
 
         analyzer.featureSelection(igMap, chiqMap);
         analyzer.reviewSelection();
-    }
 
-    public static void printMap(Map<String, Token> map, boolean ig) {
-        String name = ig? "Information Gain" : "Chi Square";
-        System.out.println("Top 20 words selected by " + name + ": ");
-        int i = 0;
-        for(Map.Entry<String, Token> en : map.entrySet()) {
-            if(++i == 20) break;
-            System.out.println(en.getKey() + ", " + name + ": " + (ig?en.getValue().getIG() : en.getValue().getChis()));
-        }
+        // Task2
+
+        // 2.1
+        analyzer.initNBModel();
+        analyzer.nb.showMap();
+
+        // 2.2
+
     }
 }

@@ -6,13 +6,16 @@ import json.JSONObject;
 import opennlp.tools.tokenize.Tokenizer;
 import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
+import org.jfree.chart.plot.Plot;
+import org.knowm.xchart.SwingWrapper;
+import org.knowm.xchart.XYChart;
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
-import structures.LanguageModel;
 import structures.NaiveBayes.NBModel;
 import structures.Post;
 import structures.Token;
 import utils.MapUtils;
+import utils.PlotUtils;
 
 import java.io.*;
 import java.util.*;
@@ -316,24 +319,65 @@ public class Classification {
      * add features to the model.
      */
     public void initNBModel() {
-        nb = new NBModel(0.1);
-
-        trainNB(nb, m_reviews);
-
-        nb.additiveSmooth(m_stats.keySet());
+        nb = createModel(0.1);
     }
 
-    public static void trainNB(NBModel nb, List<Post> re) {
-        int pos = 0, neg = 0;
-        for(Post p : re) {
-            if(p.positive()) pos++; else neg++;
-            Iterator<String> it = p.getFeatureIt();
-            while (it.hasNext()) {
-                String f = it.next();
-                nb.addToModel(f, p.positive());
-            }
+    public NBModel createModel(double smooth) {
+        NBModel res = new NBModel(smooth);
+        res.train(m_reviews);
+        res.additiveSmooth(m_stats.keySet());
+        return res;
+    }
+
+
+    /**
+     * getPR from the sorted map, which contains the FX for each post
+     * @param map sorted map
+     * @param limit fx limit
+     * @return double array of length 2, first as recall, second as precision.
+     */
+    public double [] getPR(Map<Post, Double> map, double limit) {
+        int TP = 0, FP = 0;
+
+        int count = 0;
+        for(Map.Entry<Post, Double> en: map.entrySet()) {
+            if(count++ >= limit) break;
+            if(en.getKey().positive()) TP ++; else FP++;
         }
-        nb.setZeroPara(pos, neg);
+
+        int FN = pos_num - TP, TN = neg_num - FP;
+        double precision = (TP + 0.0)/(TP + FP);
+        double recall = (TP + 0.0)/ (TP + FN);
+        return new double[]{recall, precision};
+    }
+
+    public double [][] getRPArray(NBModel nb, int num, int step) {
+        Map<Post, Double> map = nb.testFx(m_reviews);
+        System.out.println("reviews size: " + map.size());
+
+        int total = (num-1)/step;
+        //System.out.println(total);
+        double [][] RParray = new double[total+1][2];
+
+        int count = 0;
+        for(int i=0; i<num; i+=step,count++) {
+            //System.out.println(count);
+            double [] temp = getPR(map, (count+1)*step);
+            RParray[count][0] = temp[0];
+            RParray[count][1] = temp[1];
+        }
+        return RParray;
+    }
+
+    public XYChart generatePRGraph(double smooth, int num, int step) {
+        NBModel nb = createModel(smooth);
+
+        double [][] RParray = getRPArray(nb, num, step);
+        //System.out.println(Arrays.deepToString(RParray));
+
+        XYChart chart = PlotUtils.plot2D(RParray, "Precision-Recall", "Recall", "Precision", smooth + "");
+        return chart;
+
     }
 
     public static void main(String [] args) throws IOException {
@@ -358,10 +402,16 @@ public class Classification {
         // Task2
 
         // 2.1
-        analyzer.initNBModel();
-        analyzer.nb.showMap();
+//        analyzer.initNBModel();
+//        analyzer.nb.showMap();
 
         // 2.2
-
+        XYChart chart = analyzer.generatePRGraph(0.1, 50000, 1000);
+        for(double s = 0.1; s<=10; s+= 1) {
+            NBModel nb = analyzer.createModel(s);
+            double [][] rp = analyzer.getRPArray(nb, 50000, 1000);
+            PlotUtils.addSeries(rp, "smooth of" + s, chart);
+        }
+        new SwingWrapper(chart).displayChart();
     }
 }

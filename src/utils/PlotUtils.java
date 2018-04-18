@@ -26,7 +26,7 @@ public class PlotUtils {
         new SwingWrapper(chart).displayChart();
     }
 
-    public static void plot2DArray(double [][] data) {
+    public static void plot2DArrayZipfLaw(double [][] data) {
         // Create Chart
         double [] x = new double[data.length];
         double [] y = new double[data.length];
@@ -34,5 +34,24 @@ public class PlotUtils {
         XYChart chart = QuickChart.getChart("Zipf's Law", "Word rank by frequency", "Word frequency", "data", x, y);
         new SwingWrapper(chart).displayChart();
     }
+
+    public static XYChart plot2D(double [][] data, String title, String xTitle, String yTitle, String seriesName) {
+        double [] x = new double[data.length];
+        double [] y = new double[data.length];
+        MapUtils.seperate2D(data, x, y);
+        XYChart chart = QuickChart.getChart(title, xTitle, yTitle, seriesName, x, y);
+        new SwingWrapper(chart).displayChart();
+        return chart;
+    }
+
+    public static XYChart addSeries(double [][] newData, String name, XYChart chart) {
+        double [] x = new double[newData.length];
+        double [] y = new double[newData.length];
+        MapUtils.seperate2D(newData, x, y);
+        chart.addSeries(name, x, y);
+        return chart;
+    }
+
+
 
 }

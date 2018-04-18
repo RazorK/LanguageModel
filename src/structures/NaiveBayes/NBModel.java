@@ -1,6 +1,7 @@
 package structures.NaiveBayes;
 
 import structures.LanguageModel;
+import structures.Post;
 import utils.MapUtils;
 
 import java.util.*;
@@ -56,6 +57,19 @@ public class NBModel {
         processParameter();
     }
 
+    public void train(List<Post> re) {
+        int pos = 0, neg = 0;
+        for(Post p : re) {
+            if(p.positive()) pos++; else neg++;
+            Iterator<String> it = p.getFeatureIt();
+            while (it.hasNext()) {
+                String f = it.next();
+                addToModel(f, p.positive());
+            }
+        }
+        setZeroPara(pos, neg);
+    }
+
     /**
      * calculate log
      */
@@ -81,6 +95,20 @@ public class NBModel {
             }
         }
         return res;
+    }
+
+    /**
+     * test array of post based on NB model
+     * @param testSet
+     * @return
+     */
+    public Map<Post, Double> testFx(List<Post> testSet) {
+        Map<Post, Double> temp = new HashMap<>();
+        for(Post p : testSet) {
+            temp.put(p, getFX(p.getFeatures()));
+        }
+
+        return MapUtils.sortByTokenValue(temp, (en1, en2) -> -en1.getValue().compareTo(en2.getValue()));
     }
 
     // output

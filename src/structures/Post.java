@@ -226,4 +226,8 @@ public class Post {
         return features.iterator();
     }
 
+    public List<String> getFeatures() {
+        return features;
+    }
+
 }

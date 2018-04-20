@@ -3,10 +3,7 @@
  */
 package structures;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 import json.JSONException;
 import json.JSONObject;
@@ -230,4 +227,22 @@ public class Post {
         return features;
     }
 
+    public void calculateVec(HashMap<String, Integer> index, HashMap<String, Token> map) {
+        String [] tokens = new String[features.size()];
+        for(int i=0; i<features.size(); i++) {
+            tokens[i] = features.get(i);
+        }
+        setIndexMap(index);
+        setVecFromTokens(tokens, map);
+    }
+
+    int [] bucVector;
+
+    public void setBucVector(int [] i) {
+        bucVector = i;
+    }
+
+    public int[] getBucVector() {
+        return bucVector;
+    }
 }

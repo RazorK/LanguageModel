@@ -11,6 +11,7 @@ import org.knowm.xchart.SwingWrapper;
 import org.knowm.xchart.XYChart;
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
+import structures.KNN;
 import structures.NaiveBayes.NBModel;
 import structures.Post;
 import structures.Token;
@@ -353,7 +354,7 @@ public class Classification {
 
     public double [][] getRPArray(NBModel nb, int num, int step) {
         Map<Post, Double> map = nb.testFx(m_reviews);
-        System.out.println("reviews size: " + map.size());
+        //System.out.println("reviews size: " + map.size());
 
         int total = (num-1)/step;
         //System.out.println(total);
@@ -380,6 +381,85 @@ public class Classification {
 
     }
 
+
+    // Task 3
+    public void applyIDF() {
+        for(Map.Entry<String, Token> en : m_stats.entrySet()) {
+            en.getValue().setIDF(m_reviews.size());
+        }
+    }
+
+    HashMap<String, Integer> indexMap;
+    public HashMap<String, Integer> getIndex() {
+        if(indexMap == null) {
+            HashMap<String, Integer> res = new HashMap<>();
+            int index = 0;
+            for(Map.Entry<String, Token> en : m_stats.entrySet()) {
+                res.put(en.getKey(), index++);
+            }
+            indexMap = res;
+            return res;
+        }
+        return indexMap;
+    }
+
+    public void applyVector() {
+        applyIDF();
+        HashMap<String, Integer> indexMap = getIndex();
+        for(Post p: m_reviews) {
+            p.calculateVec(indexMap, m_stats);
+        }
+    }
+
+    public KNN getKNN(int k, int l) {
+        KNN res = new KNN(m_reviews, 5, getIndex());
+        res.generateRandom(l);
+        res.generateCorpusVec();
+        res.generateBucket();
+        return res;
+    }
+
+    public KNN getKNN(List<Post> reviews, int k, HashMap<String, Integer> index) {
+        KNN res = new KNN(reviews, 5, index);
+        //TODO
+        return res;
+    }
+
+    public List<Post> getQuery(String add) {
+        File dir = new File(add);
+        return analyzeQuery(LoadJson(dir.getAbsolutePath()));
+    }
+
+    private List<Post> analyzeQuery(JSONObject json) {
+        List<Post> res = new ArrayList<>();
+        try {
+            JSONArray jarray = json.getJSONArray("Reviews");
+            for (int i = 0; i < jarray.length(); i++) {
+                Post review = new Post(jarray.getJSONObject(i));
+
+                String[] tokens = Tokenize(review.getContent());
+
+                String [] nom = new String[tokens.length];
+                for(int j=0; j<tokens.length; j++) {
+                    String word = tokens[j];
+                    word = Normalization(word);
+                    word = SnowballStemming(word);
+                    nom[j] = word;
+                }
+
+                nom = MapUtils.removeEmpty(nom);
+                review.setTokens(nom);
+                review.setIndexMap(getIndex());
+                review.setVecFromTokens(nom, m_stats);
+                res.add(review);
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+
+        return res;
+    }
+
     public static void main(String [] args) throws IOException {
         Classification analyzer = new Classification(
                 "./data/Model/en-token.bin",
@@ -401,17 +481,38 @@ public class Classification {
 
         // Task2
 
-        // 2.1
+//        // 2.1
 //        analyzer.initNBModel();
 //        analyzer.nb.showMap();
+//
+//        // 2.2
+//        XYChart chart = analyzer.generatePRGraph(0.1, 50000, 1000);
+//        for(double s = 0.1; s<=10; s+= 1) {
+//            NBModel nb = analyzer.createModel(s);
+//            double [][] rp = analyzer.getRPArray(nb, 50000, 1000);
+//            PlotUtils.addSeries(rp, "smooth of" + s, chart);
+//        }
+//        new SwingWrapper(chart).displayChart();
 
-        // 2.2
-        XYChart chart = analyzer.generatePRGraph(0.1, 50000, 1000);
-        for(double s = 0.1; s<=10; s+= 1) {
-            NBModel nb = analyzer.createModel(s);
-            double [][] rp = analyzer.getRPArray(nb, 50000, 1000);
-            PlotUtils.addSeries(rp, "smooth of" + s, chart);
+        // Task3
+        analyzer.applyVector();
+        KNN knn = analyzer.getKNN(5,5);
+
+        List<Post> query = analyzer.getQuery("./data/query.json");
+        long startTime=System.currentTimeMillis();
+        for(Post q : query) {
+            knn.predictFromAll(q);
         }
-        new SwingWrapper(chart).displayChart();
+        long endTime=System.currentTimeMillis();
+        System.out.println("Run Time for KNN with full corpus： "+ (endTime-startTime) +"ms");
+
+        startTime=System.currentTimeMillis();
+        for(Post q:query) {
+            knn.predictFromBucket(q);
+        }
+        endTime=System.currentTimeMillis();
+        System.out.println("Run Time for KNN with bucket corpus： "+ (endTime-startTime) +"ms");
+
+
     }
 }

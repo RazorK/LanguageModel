@@ -111,6 +111,27 @@ public class NBModel {
         return MapUtils.sortByTokenValue(temp, (en1, en2) -> -en1.getValue().compareTo(en2.getValue()));
     }
 
+    /**
+     * get F1 score, precision, recall for result.
+     * @param res
+     * @return array of double, f1, precision, recall.
+     */
+    public static double [] getFPR(Map<Post, Double> res) {
+        int tp = 0, pos = 0, fp = 0, neg = 0;
+        for(Map.Entry<Post, Double> en: res.entrySet()) {
+            if(en.getKey().positive()) pos++; else neg++;
+            if(en.getValue()>=0) {
+                if(en.getKey().positive()) tp++; else fp++;
+            }
+        }
+
+        int fn = pos - tp, tn = neg - fp;
+        double precision = (tp + 0.0)/ (tp + fp);
+        double recall = (tp+0.0)/(tp + fn);
+        double f1 = 2.0/(1.0/recall + 1.0/precision);
+        return new double[] {f1, precision, recall};
+    }
+
     // output
     public void showMap() {
         Map<String, Double> sorted = MapUtils.sortByLogRatio(map);

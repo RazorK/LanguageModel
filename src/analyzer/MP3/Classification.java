@@ -6,15 +6,15 @@ import json.JSONObject;
 import opennlp.tools.tokenize.Tokenizer;
 import opennlp.tools.tokenize.TokenizerME;
 import opennlp.tools.tokenize.TokenizerModel;
-import org.jfree.chart.plot.Plot;
 import org.knowm.xchart.SwingWrapper;
 import org.knowm.xchart.XYChart;
 import org.tartarus.snowball.SnowballStemmer;
 import org.tartarus.snowball.ext.englishStemmer;
-import structures.KNN;
+import structures.KNN.KNN;
 import structures.NaiveBayes.NBModel;
 import structures.Post;
 import structures.Token;
+import utils.CVUtils;
 import utils.MapUtils;
 import utils.PlotUtils;
 
@@ -330,6 +330,14 @@ public class Classification {
         return res;
     }
 
+    public NBModel createModel(double smooth, List<Post> reviews) {
+        NBModel res = new NBModel(smooth);
+        res.train(reviews);
+        res.additiveSmooth(m_stats.keySet());
+        return res;
+    }
+
+
 
     /**
      * getPR from the sorted map, which contains the FX for each post
@@ -419,9 +427,11 @@ public class Classification {
         return res;
     }
 
-    public KNN getKNN(List<Post> reviews, int k, HashMap<String, Integer> index) {
-        KNN res = new KNN(reviews, 5, index);
-        //TODO
+    public static KNN getKNN(List<Post> reviews, int k, int l, HashMap<String, Integer> index) {
+        KNN res = new KNN(reviews, k, index);
+        res.generateRandom(l);
+        res.generateCorpusVec();
+        res.generateBucket();
         return res;
     }
 
@@ -460,6 +470,46 @@ public class Classification {
         return res;
     }
 
+    //task 4
+    public static void printResult(double [][][] res, int k_fold) {
+        for(int i=0; i<2; i++) {
+            for(int k=0; k<k_fold; k++) {
+                System.out.println(res[i][k][0] + "," + res[i][k][1] + "," +res[i][k][2] );
+            }
+        }
+    }
+    /**
+     * analyze result for task4
+     * @param input 3-d double array, 1-d : 0 for NB, 1 for KNN; 2-d: k-fold, 3-d f1, precision, recall.
+     */
+    public static void analyzeResult(double [][][] input, int k_fold) {
+        printResult(input, k_fold);
+
+        double [][] print = new double[2][3];
+
+        // i: 0 for nb, 1 for knn
+        for(int i=0; i<2; i++) {
+            // k for f1, precision, recall
+            for(int k = 0; k<3; k++) {
+                double res = 0;
+                for(int j=0; j<k_fold; j++) {
+                    res += input[i][j][k];
+                }
+                print[i][k] = res/k_fold;
+            }
+        }
+
+        for(int i=0; i<2; i++) {
+            for(int j=0; j<3; j++) {
+                String name = i == 0? "Naive Bayes" : "KNN";
+                String score;
+                if(j==0) score = "F-1 Score"; else if(j==1) score = "Precision"; else score = "Recall";
+
+                System.out.println("Average" + score + " for " + name + " Model: " + print[i][j]);
+            }
+        }
+    }
+
     public static void main(String [] args) throws IOException {
         Classification analyzer = new Classification(
                 "./data/Model/en-token.bin",
@@ -496,23 +546,79 @@ public class Classification {
 
         // Task3
         analyzer.applyVector();
-        KNN knn = analyzer.getKNN(5,5);
 
-        List<Post> query = analyzer.getQuery("./data/query.json");
-        long startTime=System.currentTimeMillis();
-        for(Post q : query) {
-            knn.predictFromAll(q);
+//        KNN knn = analyzer.getKNN(5,5);
+//        knn.setDebug(true);
+//        List<Post> query = analyzer.getQuery("./data/query.json");
+//        long startTime=System.currentTimeMillis();
+//        for(Post q : query) {
+//            knn.predictFromAll(q);
+//        }
+//        long endTime=System.currentTimeMillis();
+//        System.out.println("Run Time for KNN with full corpus： "+ (endTime-startTime) +"ms");
+//
+//        startTime=System.currentTimeMillis();
+//        for(Post q:query) {
+//            knn.predictFromBucket(q);
+//        }
+//        endTime=System.currentTimeMillis();
+//        System.out.println("Run Time for KNN with bucket corpus： "+ (endTime-startTime) +"ms");
+
+        // Task4
+        //CrossValidation
+
+//        int k_fold = 10;
+//        CVUtils cv = new CVUtils(analyzer.m_reviews.size(), k_fold);
+//        double [][][] result = new double [2][k_fold][3];
+//        for(int i=0; i<k_fold; i++) {
+//            System.out.println("Starting fold-" + i);
+//            List<Post> train = CVUtils.getItems(analyzer.m_reviews, cv.getTrainIndex(i));
+//            List<Post> test = CVUtils.getItems(analyzer.m_reviews, cv.getTestIndex(i));
+//            NBModel nb = analyzer.createModel(0.1, train);
+//            result[0][i] = NBModel.getFPR(nb.testFx(test));
+//
+//            KNN knn1 = getKNN(train, 5, 5, analyzer.getIndex());
+//            result[1][i] = knn1.getFPR(test);
+//        }
+//
+//        analyzeResult(result, k_fold);
+
+        // Task 5.
+
+        int l = 6;
+        for(int k = 6; k<8; k++) {
+            double [][] k_res = new double[10][3];
+            CVUtils cv = new CVUtils(analyzer.m_reviews.size(), 10);
+            for(int i=0; i<10; i++) {
+                System.out.println("Starting fold-" + i);
+                List<Post> train = CVUtils.getItems(analyzer.m_reviews, cv.getTrainIndex(i));
+                List<Post> test = CVUtils.getItems(analyzer.m_reviews, cv.getTestIndex(i));
+
+                KNN knn1 = getKNN(train, k, l, analyzer.getIndex());
+                //knn1.setDebug(true);
+                double [] res = knn1.getFPR(test);
+                k_res[i] = res;
+                System.out.println("k: " + k +", l:" +l + ", f-1: " + res[0] + ", precision: " + res[1]
+                    + ", recall: " + res[2]);
+            }
+            printKFold(k_res);
         }
-        long endTime=System.currentTimeMillis();
-        System.out.println("Run Time for KNN with full corpus： "+ (endTime-startTime) +"ms");
 
-        startTime=System.currentTimeMillis();
-        for(Post q:query) {
-            knn.predictFromBucket(q);
+    }
+
+    public static void printKFold(double[][] k_res) {
+        double [] res = new double[3];
+        for(int i=0; i<k_res.length; i++) {
+            for(int j=0; j<3; j++) {
+                res[j] += k_res[i][j];
+            }
         }
-        endTime=System.currentTimeMillis();
-        System.out.println("Run Time for KNN with bucket corpus： "+ (endTime-startTime) +"ms");
 
+        for(int i=0; i<3; i++) {
+            res[i] = res[i]/10.0;
+        }
 
+        System.out.println("Printing k_fold avg result: " );
+        System.out.println(Arrays.toString(res));
     }
 }

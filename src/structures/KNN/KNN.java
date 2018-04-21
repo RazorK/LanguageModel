@@ -1,4 +1,8 @@
-package structures;
+package structures.KNN;
+
+import structures.Pair;
+import structures.Post;
+import structures.VectorWeight;
 
 import java.util.*;
 
@@ -12,6 +16,8 @@ public class KNN {
         reviews = p;
         k = k_value;
         this.index = index;
+
+        debug = false;
     }
 
     public void setK(int k) {
@@ -46,7 +52,7 @@ public class KNN {
         return x >= 0? 1 : 0;
     }
 
-    public int[] innerProduct(VectorWeight [] vec) {
+    public int[] innerProduct(VectorWeight[] vec) {
         int [] result = new int [l];
         for(int j=0; j<l; j++) {
             double res = 0;
@@ -82,9 +88,9 @@ public class KNN {
     }
 
     public void printBucket() {
-        System.out.println("Printing Bucket: ");
+        debug("Printing Bucket: ");
         for(Map.Entry<Integer, List<Post>> en: buckets.entrySet()) {
-            System.out.println("Index: " + en.getKey() + ", Size: " + en.getValue().size());
+            debug("Index: " + en.getKey() + ", Size: " + en.getValue().size());
         }
     }
     /**
@@ -112,9 +118,61 @@ public class KNN {
         return predictFromList(corpus, p);
     }
 
+    boolean debug;
+    public void setDebug(boolean de) {
+        debug =de;
+    }
+
+    public void debug(String s) {
+        if(debug) {
+            System.out.println(s);
+        }
+    }
+
+    public int predictFromList_V3(List<Post> ps, Post p) {
+        List<Post> corpus = new ArrayList<>(ps);
+        List<Pair<Post, Double>> cops = new ArrayList<>();
+        for(Post cor: corpus) {
+            cops.add(new Pair<>(cor, p.similiarity(cor)));
+        }
+        debug("Starting corpus sort" + corpus.size());
+        Collections.sort(cops, new Comparator<Pair<Post, Double>>() {
+            @Override
+            public int compare(Pair<Post, Double> o1, Pair<Post, Double> o2) {
+                return -((Double) o1.getRight()).compareTo(o2.getRight());
+            }
+        });
+        debug("end corpus sort");
+        int pos = 0, neg = 0;
+        for(int i=0; i<k; i++) {
+            if(cops.get(i).getLeft().positive()) pos++;
+            else neg++;
+        }
+        debug("In" + k + " nearest neighbor, pos: " + pos + ", neg: " + neg);
+        return pos>neg? 1:0;
+    }
+
     public int predictFromList(List<Post> ps, Post p) {
         List<Post> corpus = new ArrayList<>(ps);
-        System.out.println("Starting corpus sort" + corpus.size());
+        debug("Starting corpus sort" + corpus.size());
+        KNN_Sorting st = new KNN_Sorting(k, p);
+        for(Post one: ps) {
+            st.addOneToModel(one);
+        }
+        debug("end corpus sort");
+        int pos = 0, neg = 0;
+        Map<Post, Double> map = st.getMap();
+        for(Map.Entry<Post, Double> en:map.entrySet()) {
+            debug("FromListDebug" + en.getValue());
+            if(en.getKey().positive()) pos ++; else neg++;
+        }
+        debug("In" + k + " nearest neighbor, pos: " + pos + ", neg: " + neg);
+        return pos>neg? 1:0;
+    }
+
+    public int Old_predictFromList(List<Post> ps, Post p) {
+        List<Post> corpus = new ArrayList<>(ps);
+        debug("Starting corpus sort" + corpus.size());
         Collections.sort(corpus, new Comparator<Post>() {
             @Override
             public int compare(Post o1, Post o2) {
@@ -123,23 +181,48 @@ public class KNN {
                 return ((Double)s1).compareTo(s2);
             }
         });
-        System.out.println("end corpus sort");
+        debug("end corpus sort");
         int pos = 0, neg = 0;
         for(int i=0; i<k; i++) {
-            System.out.println(corpus.get(i).getContent());
+            debug(corpus.get(i).getContent());
             if(corpus.get(i).positive()) pos++;
             else neg++;
         }
-        System.out.println("In" + k + " nearest neighbor, pos: " + pos + ", neg: " + neg);
+        debug("In" + k + " nearest neighbor, pos: " + pos + ", neg: " + neg);
         return pos>neg? 1:0;
     }
 
     public int predictFromBucket(Post p) {
         if(p.getBucVector() == null)  getVec(p);
-        System.out.println("Query Bucket Index: " + getInteger(p.getBucVector()));
+        debug("Query Bucket Index: " + getInteger(p.getBucVector()));
         List<Post> bucket = buckets.get(getInteger(p.getBucVector()));
-        if(bucket.size() < k) return predictFromAll(p);
+        if(bucket == null||bucket.size() < k) return predictFromAll(p);
         return predictFromList(bucket, p);
     }
 
+    public double [] getFPR(List<Post> ps) {
+        int tp = 0, fp = 0, fn = 0, tn = 0;
+        int count = 0;
+        int cur = 0;
+        for(Post p : ps) {
+            count++;
+            if(count - cur > 1000) {
+                System.out.println("Cur: " + count);
+                cur = count;
+            }
+            if(p.positive()) {
+                if(predictFromBucket(p) == 1) {
+                    tp++;
+                } else fn++;
+            } else {
+                if(predictFromBucket(p) == 0) tn ++;
+                else fp++;
+            }
+        }
+
+        double precision = (tp + 0.0)/ (tp + fp);
+        double recall = (tp+0.0)/(tp + fn);
+        double f1 = 2.0/(1.0/recall + 1.0/precision);
+        return new double[] {f1, precision, recall};
+    }
 }
